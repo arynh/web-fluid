@@ -1,0 +1,14 @@
+{
+  "name": "web-fluid",
+  "version": "1.0.0",
+  "description": "A web-based, 3D, real-time fluid simulation.",
+  "main": "index.js",
+  "repository": "https://github.com/arynh/web-fluid.git",
+  "author": "Aryn Harmon <harmon.aryn@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "gpu.js": "^2.11.3",
+    "http-server": "^0.12.3"
+  },
+  "scripts": {"start": "http-server"}
+}
