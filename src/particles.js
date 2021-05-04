@@ -3,7 +3,7 @@ const ATTRIBUTE_COUNT = 6;
 /**
  * Represent the particle cloud.
  */
-class Particles {
+export class Particles {
   /**
    * Create a set of particles. The density of the particles determines how
    * many are made, and the bounds determine the initial position of the
@@ -18,9 +18,9 @@ class Particles {
     this.particleIndices = [];
     let particle_counter = 0;
     let gap_between = 1 / Math.cbrt(density);
-    for (let x = bounds.min.x; x < bounds.max.x; x += gap_between) {
-      for (let y = bounds.min.y; y < bounds.max.y; y += gap_between) {
-        for (let z = bounds.min.z; z < bounds.max.z; z += gap_between) {
+    for (let x = bounds.min[0]; x < bounds.max[0]; x += gap_between) {
+      for (let y = bounds.min[1]; y < bounds.max[1]; y += gap_between) {
+        for (let z = bounds.min[2]; z < bounds.max[2]; z += gap_between) {
           // push initial particle _
           this.particleBuffer.push(x); // initial position
           this.particleBuffer.push(y);
@@ -30,7 +30,7 @@ class Particles {
           this.particleBuffer.push(0);
 
           // push particles indices
-          this.particleIndices.push(++particle_counter * ATTRIBUTE_COUNT);
+          this.particleIndices.push(particle_counter++ * ATTRIBUTE_COUNT);
         }
       }
     }

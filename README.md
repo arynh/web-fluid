@@ -9,7 +9,7 @@ For every simulation loop:
 - clear the grid velocities
 - project particle velocities to the grid
 - copy the grid to store the version from the previous time step
-- mark cells, not entirely clear what this step does
+- mark cells as solid, fluid, or air
 - perform gravity update
 - enforce boundary conditions
 - do the pressure solve
