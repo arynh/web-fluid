@@ -14,87 +14,60 @@
  *      - add velocity * weight
  *      - where weight is given as triangle function
  */
-
-/** Calulate weights
- * In:  particle buffer
- * Out: weight per particle (dimension: [# particles])
- */
-export const createParticleWeightsKernel = (gpu, particleCount, edgeCount) =>
+export const createParticleToGridKernel = (gpu, particleCount, nx, ny, nz) =>
   gpu
-    .createKernel(function (particles, cellSize, dimension) {
-      let position = particles[this.thread.x * 6 + dimension];
-      let velocity = particles[this.thread.x * 6 + 3 + dimension];
-
-      // get the indices of the grid boundries that lie around this particle
-      let scaledPosition = position / cellSize;
-      let lowerEdgeIndex = Math.floor(scaledPosition);
-      let upperEdgeIndex = Math.ceil(scaledPosition);
-      // if the current edge isn't relevant, return 0
-      if (this.thread.z != lowerEdgeIndex && this.thread.z != upperEdgeIndex) {
+    .addFunction(function triangle(r) {
+      let r_magnitude = Math.abs(r);
+      if (r_magnitude >= 1) {
         return 0;
       }
-
-      // calculate the weight based on the triangle weighting function
-      let weight = 0;
-      if (this.thread.z == lowerEdgeIndex) {
-        weight = 1 - (position - lowerEdgeIndex * cellSize) / cellSize;
-      } else {
-        weight = 1 + (position - upperEdgeIndex * cellSize) / cellSize;
-      }
-
-      if (this.thread.y == 0) {
-        return velocity * weight;
-      } else {
-        return weight;
-      }
+      return 1 - r_magnitude;
     })
-    .setOutput([particleCount, 2, edgeCount]);
+    .createKernel(function (particles, cellSize, dimension) {
+      // get spatial location of grid velocity vector
+      let x = this.thread.x * cellSize;
+      let y = this.thread.y * cellSize;
+      let z = this.thread.z * cellSize;
 
-export const createWeightedSumKernel = (gpu, particleCount, edgeCount) =>
-  gpu
-    .createKernel(function (weightedSumValues) {
-      let sum = 0;
-      for (let i = 0; i < this.constants.particleCount; i++) {
-        sum += weightedSumValues[i][this.thread.x][this.thread.y];
+      // declare numerator and denominator of the weighted sum
+      let numerator = 0;
+      let denominator = 0;
+      /* loop through particles to find ones that are close, add their
+         velocity contribution to the grid velocity */
+      for (
+        let particleIndex = 0;
+        particleIndex < this.constants.particleCount;
+        particleIndex++
+      ) {
+        // calculate distance in each dimension
+        let distance_x = particles[particleIndex * 6] - x;
+        let distance_y = particles[particleIndex * 6 + 1] - y;
+        let distance_z = particles[particleIndex * 6 + 2] - z;
+
+        // if it's far, skip it
+        if (
+          Math.abs(distance_x) > cellSize ||
+          Math.abs(distance_y) > cellSize ||
+          Math.abs(distance_z) > cellSize
+        ) {
+          continue;
+        }
+
+        // calculate the weight according to the trilinear interpolation
+        let weight =
+          triangle(distance_x / cellSize) *
+          triangle(distance_y / cellSize) *
+          triangle(distance_z / cellSize);
+
+        numerator += particles[particleIndex * 6 + 3 + dimension] * weight;
+        denominator += weight;
       }
-      return sum;
-    })
-    .setConstants({ particleCount: particleCount })
-    .setOutput([2, edgeCount]);
 
-export const createNewVelocitiesKernel = (gpu, edgeCount) =>
-  gpu
-    .createKernel(function (weightedSumValues) {
-      let denominator = weightedSumValues[1][this.thread.x];
+      // check for divide by zero
       if (Math.abs(denominator) < 0.0001) {
         return 0;
       }
-      return weightedSumValues[0][this.thread.x] / denominator;
+      return numerator / denominator;
     })
-    .setOutput([edgeCount]);
-
-export const createParticleToGridKernel = (gpu, particleCount, edgeCount) => {
-  const particleWeightsKernel = createParticleWeightsKernel(
-    gpu,
-    particleCount,
-    edgeCount
-  );
-  const weightedSumKernel = createWeightedSumKernel(
-    gpu,
-    particleCount,
-    edgeCount
-  );
-  const newVelocitiesKernel = createNewVelocitiesKernel(gpu, edgeCount);
-
-  // pipeline these three kernels
-  return gpu.combineKernels(
-    particleWeightsKernel,
-    weightedSumKernel,
-    newVelocitiesKernel,
-    function (particles, cellSize, dimension) {
-      return newVelocitiesKernel(
-        weightedSumKernel(particleWeightsKernel(particles, cellSize, dimension))
-      );
-    }
-  );
-};
+    .setConstants({ particleCount: particleCount })
+    .setOutput([nx, ny, nz]);
