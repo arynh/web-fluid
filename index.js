@@ -9,6 +9,7 @@ import {
   createWeightedSumKernel,
   createNewVelocitiesKernel,
 } from "./src/simulation/transfer-particle-to-grid.js";
+import { createClassifyVoxelsKernel } from "./src/simulation/classify-voxels.js";
 import { Particles } from "./src/particles.js";
 import { MACGrid } from "./src/mac-grid.js";
 
@@ -56,7 +57,14 @@ const weightedSumKernel = createWeightedSumKernel(
   edgeCount
 );
 const newVelocitiesKernel = createNewVelocitiesKernel(gpu, edgeCount);
-
+//create classify voxels kernel
+const classifyVoxelsKernel = createClassifyVoxelsKernel(
+  gpu,
+  particleCount,
+  grid.count[0],
+  grid.count[1] - 1,
+  grid.count[2] - 1
+)
 const weights = particleWeightsKernel(particles.particleBuffer, 1, 0);
 console.log("\nweights:");
 console.log(weights);
@@ -65,7 +73,8 @@ const sums = weightedSumKernel(weights);
 console.log("\nsums:");
 console.log(sums);
 const newGridVelocities = newVelocitiesKernel(sums);
-
+//classify the voxels using the gpu
+const classifyVoxels = classifyVoxelsKernel(grid.voxelStates,particles.particleBuffer,grid.cellSize)
 // const particleToGridKernel = createParticleToGridKernel(gpu, 1, 2);
 // const newGridVelocities = particleToGridKernel(particles.particleBuffer, 1, 0);
 

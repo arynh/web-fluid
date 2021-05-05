@@ -1,6 +1,6 @@
 import {STATE_ENUM} from "../mac-grid.js"
 //export makes it public so you can import into index.js
-export const createClassifyVoxelsKernel = (gpu,nx,ny,nz) =>
+export const createClassifyVoxelsKernel = (gpu,particleCount,nx,ny,nz) =>
 gpu
   .createKernel(function (voxelStates,particles,cellSize) {
     //check if there is a particle in that grid
@@ -10,7 +10,7 @@ gpu
     let z = this.thread.z * cellSize;
 
     var particle_exists = false;
-    for (let i = 0; i < particles.length; i++) {
+    for (let i = 0; i < this.constants.particleCount; i++) {
       let pos_x = particles[i*6];
       let pos_y = particles[i*6+1];
       let pos_z = particles[i*6+2];
@@ -32,4 +32,5 @@ gpu
       }
     }
   })
+  .setConstants({ particleCount: particleCount })
   .setOutput([nx, ny, nz]);
