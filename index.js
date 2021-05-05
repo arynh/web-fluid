@@ -64,7 +64,6 @@ console.log(weights);
 const sums = weightedSumKernel(weights);
 console.log("\nsums:");
 console.log(sums);
-
 const newGridVelocities = newVelocitiesKernel(sums);
 
 // const particleToGridKernel = createParticleToGridKernel(gpu, 1, 2);

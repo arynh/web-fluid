@@ -55,6 +55,7 @@ export class MACGrid {
 
     // initialize voxel states
     this.voxelStates = initialize3DArray(nx, ny, nz);
+
   }
 
   /**
