@@ -8,7 +8,7 @@ For every simulation loop:
 
 - [x] clear the grid velocities
 - [x] project particle velocities to the grid
-- [ ] copy the grid to store the version from the previous time step
+- [x] copy the grid to store the version from the previous time step
 - [x] mark cells as solid, fluid, or air
 - [x] perform gravity update
 - [ ] enforce boundary conditions
