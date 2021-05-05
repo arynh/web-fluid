@@ -22,13 +22,11 @@ const grid = new MACGrid(
   },
   0.5
 );
-console.log("grid pressure:");
-console.log(grid.pressure);
-console.log("grid x velocity:");
-console.log(grid.velocity_x);
+grid.addDefaultSolids();
+console.log("grid states:");
+console.log(grid.voxelStates);
 
 const particleCount = particles.count();
-const edgeCount = grid.count[0];
 
 const gpu = new GPU();
 const particleToGridKernel = createParticleToGridKernel(
