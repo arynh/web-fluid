@@ -1,36 +1,58 @@
-import {STATE_ENUM} from "../mac-grid.js"
-//export makes it public so you can import into index.js
-export const createClassifyVoxelsKernel = (gpu,particleCount,nx,ny,nz) =>
-gpu
-  .createKernel(function (voxelStates,particles,cellSize) {
-    //check if there is a particle in that grid
-    // get spatial location of grid velocity vector
-    let x = this.thread.x * cellSize;
-    let y = this.thread.y * cellSize;
-    let z = this.thread.z * cellSize;
+import { STATE_ENUM } from "../mac-grid.js";
 
-    var particle_exists = false;
-    for (let i = 0; i < this.constants.particleCount; i++) {
-      let pos_x = particles[i*6];
-      let pos_y = particles[i*6+1];
-      let pos_z = particles[i*6+2];
-      if (Math.abs(pos_x-x) < cellSize && Math.abs(pos_y-y) < cellSize && Math.abs(pos_z-z) < cellSize) {
-        particle_exists = true;
-        break;
+export const createClassifyVoxelsKernel = (gpu, particleCount, nx, ny, nz) =>
+  gpu
+    .createKernel(function (voxelStates, particles, cellSize) {
+      // get spatial location of grid
+      let x = cellSize * this.thread.x;
+      let y = cellSize * this.thread.y;
+      let z = cellSize * this.thread.z;
+
+      let particle_exists = false;
+      for (let i = 0; i < this.constants.particleCount; i++) {
+        let pos_x = particles[i * 6];
+        let pos_y = particles[i * 6 + 1];
+        let pos_z = particles[i * 6 + 2];
+        // check if there is a particle in that grid
+        if (
+          pos_x - x <= cellSize &&
+          pos_x - x > 0 &&
+          pos_y - y <= cellSize &&
+          pos_y - y > 0 &&
+          pos_z - z <= cellSize &&
+          pos_z - z > 0
+        ) {
+          particle_exists = true;
+          break;
+        }
       }
-    }
-    //use cellsize and the xyz to figure out your grid cell dims and use particles pos to compare
-    //if there is and the state is air flip it to fluid
-    if (particle_exists) {
-      if (voxelStates[this.thread.x][this.thread.y][this.thread.z] !== STATE_ENUM.SOLID){
-        return STATE_ENUM.FLUID;
+      // set any cell with a particle in it that isn't solid to fluid
+      // any cell without a particle or solid is air
+      if (particle_exists) {
+        if (
+          voxelStates[this.thread.x][this.thread.y][this.thread.z] !==
+          this.constants.SOLID
+        ) {
+          return this.constants.FLUID;
+        } else {
+          return this.constants.SOLID;
+        }
+      } else {
+        // if there isn't, and the state is fluid, flip it to air
+        if (
+          voxelStates[this.thread.x][this.thread.y][this.thread.z] !==
+          this.constants.SOLID
+        ) {
+          return this.constants.AIR;
+        } else {
+          return this.constants.SOLID;
+        }
       }
-    } else {
-      //if there isn't and the state is flud flip it to air
-      if (voxelStates[this.thread.x][this.thread.y][this.thread.z] !== STATE_ENUM.SOLID){
-        return STATE_ENUM.AIR;
-      }
-    }
-  })
-  .setConstants({ particleCount: particleCount })
-  .setOutput([nx, ny, nz]);
+    })
+    .setConstants({
+      particleCount: particleCount,
+      AIR: STATE_ENUM.AIR,
+      FLUID: STATE_ENUM.FLUID,
+      SOLID: STATE_ENUM.SOLID,
+    })
+    .setOutput([nx, ny, nz]);

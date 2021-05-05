@@ -45,17 +45,16 @@ export class MACGrid {
     vec3.floor(this.count, this.count);
 
     /// initialize
-    let nx = this.count[0] - 1;
-    let ny = this.count[1] - 1;
-    let nz = this.count[2] - 1;
-    this.pressure = initialize3DArray(nx, ny, nz);
-    this.velocity_x = initialize3DArray(nx + 1, ny, nz);
-    this.velocity_y = initialize3DArray(nx, ny + 1, nz);
-    this.velocity_z = initialize3DArray(nx, ny, nz + 1);
+    this.nx = this.count[0] - 1;
+    this.ny = this.count[1] - 1;
+    this.nz = this.count[2] - 1;
+    this.pressure = initialize3DArray(this.nx, this.ny, this.nz);
+    this.velocity_x = initialize3DArray(this.nx + 1, this.ny, this.nz);
+    this.velocity_y = initialize3DArray(this.nx, this.ny + 1, this.nz);
+    this.velocity_z = initialize3DArray(this.nx, this.ny, this.nz + 1);
 
     // initialize voxel states
-    this.voxelStates = initialize3DArray(nx, ny, nz);
-
+    this.voxelStates = initialize3DArray(this.nx, this.ny, this.nz);
   }
 
   /**
@@ -63,22 +62,19 @@ export class MACGrid {
    * else untouched.
    */
   addDefaultSolids() {
-    let nx = this.count[0] - 1;
-    let ny = this.count[1] - 1;
-    let nz = this.count[2] - 1;
-    for (let i = 0; i < nx; i++) {
-      if (i !== 0 && i !== nx - 1) {
-        continue;
-      }
-      for (let j = 0; j < ny; j++) {
-        if (j !== 0 && j !== ny - 1) {
-          continue;
-        }
-        for (let k = 0; k < nz; k++) {}
-        if (k !== 0 && k !== nz - 1) {
-          continue;
-        } else {
-          this.voxelStates[i][j][k] = STATE_ENUM.SOLID;
+    for (let i = 0; i < this.nx; i++) {
+      for (let j = 0; j < this.ny; j++) {
+        for (let k = 0; k < this.nz; k++) {
+          if (
+            i === 0 ||
+            j === 0 ||
+            k === 0 ||
+            i === this.nx - 1 ||
+            j === this.ny - 1 ||
+            k === this.nz - 1
+          ) {
+            this.voxelStates[i][j][k] = STATE_ENUM.SOLID;
+          }
         }
       }
     }
