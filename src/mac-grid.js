@@ -59,7 +59,7 @@ export class MACGrid {
 
   /**
    * Set all voxels on the boundary of the grid to be solids. Leave everything
-   * else untouched.
+   * else untouched (by default, air).
    */
   addDefaultSolids() {
     for (let i = 0; i < this.nx; i++) {

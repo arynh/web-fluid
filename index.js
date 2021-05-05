@@ -1,21 +1,14 @@
 import { GPU } from "gpu.js";
 import { vec3 } from "gl-matrix";
-import { createClassifyVoxelsKernel } from "./src/simulation/classify-voxels.js";
+import { createParticleToGridKernel } from "./src/simulation/transfer-particle-to-grid.js";
 import { Particles } from "./src/particles.js";
 import { MACGrid } from "./src/mac-grid.js";
 
 // create one test particle with velocity <1,1,1>
-const particles = new Particles(1, {
+const particles = new Particles(10, {
   min: vec3.fromValues(0.0, 0.0, 0.0),
   max: vec3.fromValues(1.0, 1.0, 1.0),
 });
-particles.particleBuffer[0] = 0.4;
-particles.particleBuffer[1] = 0.4;
-particles.particleBuffer[2] = 0.4;
-particles.particleBuffer[3] = 2;
-particles.particleBuffer[4] = 1;
-particles.particleBuffer[5] = 1;
-
 console.log("particle buffer:");
 console.log(particles.particleBuffer);
 console.log("particle indices:");
@@ -27,7 +20,7 @@ const grid = new MACGrid(
     min: vec3.fromValues(0.0, 0.0, 0.0),
     max: vec3.fromValues(1.0, 1.0, 1.0),
   },
-  0.25
+  0.5
 );
 grid.addDefaultSolids();
 console.log("grid states:");
@@ -36,22 +29,31 @@ console.log(grid.voxelStates);
 const particleCount = particles.count();
 
 const gpu = new GPU();
-
-//create classify voxels kernel
-const classifyVoxelsKernel = createClassifyVoxelsKernel(
+const particleToGridKernel = createParticleToGridKernel(
   gpu,
   particleCount,
-  grid.nx,
-  grid.ny,
-  grid.nz
+  grid.count[0],
+  grid.count[1] - 1,
+  grid.count[2] - 1
 );
 
-//classify the voxels using the gpu
-const classifyVoxels = classifyVoxelsKernel(
-  grid.voxelStates,
+const newGridVelocitiesX = particleToGridKernel(
   particles.particleBuffer,
-  grid.cellSize
+  grid.cellSize,
+  0
+);
+const newGridVelocitiesY = particleToGridKernel(
+  particles.particleBuffer,
+  grid.cellSize,
+  1
+);
+const newGridVelocitiesZ = particleToGridKernel(
+  particles.particleBuffer,
+  grid.cellSize,
+  2
 );
 
-console.log("\nnew voxels:");
-console.log(classifyVoxels);
+console.log("\nnew grid velocities:");
+console.log(newGridVelocitiesX);
+console.log(newGridVelocitiesY);
+console.log(newGridVelocitiesZ);
