@@ -25,9 +25,9 @@ export const createParticleToGridKernel = (gpu, particleCount, nx, ny, nz) =>
     })
     .createKernel(function (particles, cellSize, dimension) {
       // get spatial location of grid velocity vector
-      let x = this.thread.x * cellSize;
-      let y = this.thread.y * cellSize;
-      let z = this.thread.z * cellSize;
+      let x = cellSize * this.thread.x;
+      let y = cellSize * this.thread.y;
+      let z = cellSize * this.thread.z;
 
       // declare numerator and denominator of the weighted sum
       let numerator = 0;
