@@ -1,6 +1,14 @@
 import { ATTRIBUTE_COUNT } from "../particles.js";
-//add kernel for subracting the two and sending it to the createFLIPKernel
 
+//kernel for subracting the new grid velocities from the old grid velocities
+export const createGridVelocityDifferenceKernel = (gpu, nx, ny, nz) =>
+  gpu
+    .createKernel(function (oldVelocities,newVelocities) {
+      return oldVelocities[this.thread.x][this.thread.y][this.thread.z] - newVelocities[this.thread.x][this.thread.y][this.thread.z];
+    })
+    .setOutput([nx, ny, nz]);
+
+//FLIP Kernel
 export const createFLIPKernel = (gpu,particleCount) =>
   gpu
     .addFunction(function lerp(a, b, t) {
