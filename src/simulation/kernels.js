@@ -9,19 +9,15 @@ import {
 } from "./enforce-boundary-conditions.js";
 import { createParticleToGridKernel } from "./transfer-particle-to-grid.js";
 import { createClearGridKernel } from "./clear-grid-velocities.js";
+import { createGridToParticlesKernel } from "./flip.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
 
-  const pressureSize = [grid.nx, grid.ny, grid.nz];
+  const gridSize = [grid.nx, grid.ny, grid.nz];
   const velocityXSize = [grid.nx + 1, grid.ny, grid.nz];
   const velocityYSize = [grid.nx, grid.ny + 1, grid.nz];
   const velocityZSize = [grid.nx, grid.ny, grid.nz + 1];
-
-  // make blank velocity arrays
-  const clearVelocityX = createClearGridKernel(gpu, ...velocityXSize);
-  const clearVelocityY = createClearGridKernel(gpu, ...velocityYSize);
-  const clearVelocityZ = createClearGridKernel(gpu, ...velocityZSize);
 
   // project particle velocities to the grid
   const particleToXGrid = createParticleToGridKernel(
@@ -41,7 +37,7 @@ export const compileKernels = (gpu, particles, grid) => {
   );
 
   // copy grid quantities to save
-  const copyPressure = createCopyKernel(gpu, ...pressureSize);
+  const copyPressure = createCopyKernel(gpu, ...gridSize);
   const copyXVelocity = createCopyKernel(gpu, ...velocityXSize);
   const copyYVelocity = createCopyKernel(gpu, ...velocityYSize);
   const copyZVelocity = createCopyKernel(gpu, ...velocityZSize);
@@ -50,7 +46,7 @@ export const compileKernels = (gpu, particles, grid) => {
   const classifyVoxels = createClassifyVoxelsKernel(
     gpu,
     particles.count(),
-    ...pressureSize
+    ...gridSize
   );
 
   // add gravitational influence
@@ -65,7 +61,7 @@ export const compileKernels = (gpu, particles, grid) => {
   // TODO: implement these kernels
 
   // update the velocities of the particles using PIC/FLIP
-  // TODO: implement this shader
+  const gridToParticles = createGridToParticlesKernel(gpu, particles.count(), ...gridSize, grid.cellSize);
 
   // update the positions of the particles
   const advectParticles = createAdvectParticlesKernel(gpu, particles.count());
@@ -74,9 +70,6 @@ export const compileKernels = (gpu, particles, grid) => {
   console.log(`Kernels compiled in ${end - start} ms.`);
 
   return {
-    clearVelocityX: clearVelocityX,
-    clearVelocityY: clearVelocityY,
-    clearVelocityZ: clearVelocityZ,
     particleToXGrid: particleToXGrid,
     particleToYGrid: particleToYGrid,
     particleToZGrid: particleToZGrid,
@@ -89,6 +82,7 @@ export const compileKernels = (gpu, particles, grid) => {
     enforceXBoundary: enforceXBoundary,
     enforceYBoundary: enforceYBoundary,
     enforceZBoundary: enforceZBoundary,
+    gridToParticles: gridToParticles,
     advectParticles: advectParticles,
   };
 };

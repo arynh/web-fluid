@@ -12,10 +12,9 @@ For every simulation loop:
 - [x] mark cells as solid, fluid, or air
 - [x] perform gravity update
 - [x] enforce boundary conditions
-- [ ] do the pressure solve
-- [ ] extrapolate velocity
+- [ ] do the pressure solve and generate new grid velocities
 - [x] enforce boundary conditions
-- [ ] update the velocities of the particles
+- [x] update the velocities of the particles
 - [x] update the positions of the particles
 
 ## Installation
