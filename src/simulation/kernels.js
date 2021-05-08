@@ -8,6 +8,7 @@ import {
   createEnforceBoundaryZKernel,
 } from "./enforce-boundary-conditions.js";
 import { createParticleToGridKernel } from "./transfer-particle-to-grid.js";
+import { createClearGridKernel } from "./clear-grid-velocities.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
@@ -16,6 +17,11 @@ export const compileKernels = (gpu, particles, grid) => {
   const velocityXSize = [grid.nx + 1, grid.ny, grid.nz];
   const velocityYSize = [grid.nx, grid.ny + 1, grid.nz];
   const velocityZSize = [grid.nx, grid.ny, grid.nz + 1];
+
+  // make blank velocity arrays
+  const clearVelocityX = createClearGridKernel(gpu, ...velocityXSize);
+  const clearVelocityY = createClearGridKernel(gpu, ...velocityYSize);
+  const clearVelocityZ = createClearGridKernel(gpu, ...velocityZSize);
 
   // project particle velocities to the grid
   const particleToXGrid = createParticleToGridKernel(
@@ -68,6 +74,9 @@ export const compileKernels = (gpu, particles, grid) => {
   console.log(`Kernels compiled in ${end - start} ms.`);
 
   return {
+    clearVelocityX: clearVelocityX,
+    clearVelocityY: clearVelocityY,
+    clearVelocityZ: clearVelocityZ,
     particleToXGrid: particleToXGrid,
     particleToYGrid: particleToYGrid,
     particleToZGrid: particleToZGrid,

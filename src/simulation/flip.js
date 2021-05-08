@@ -1,18 +1,18 @@
 import { ATTRIBUTE_COUNT } from "../particles.js";
 
 // kernel for subracting the new grid velocities from the old grid velocities
-export const createGridVelocityDifferenceKernel = (gpu, nx, ny, nz) =>
+const createGridVelocityDifferenceKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (oldVelocities, newVelocities) {
       return (
-        oldVelocities[this.thread.x][this.thread.y][this.thread.z] -
-        newVelocities[this.thread.x][this.thread.y][this.thread.z]
+        newVelocities[this.thread.x][this.thread.y][this.thread.z] -
+        oldVelocities[this.thread.x][this.thread.y][this.thread.z]
       );
     })
     .setOutput([nx, ny, nz]);
 
 // FLIP Kernel
-export const createFLIPKernel = (gpu, particleCount, cellSize) =>
+const createFLIPKernel = (gpu, particleCount, cellSize) =>
   gpu
     .createKernel(function (particles, diffGridVx, diffGridVy, diffGridVz) {
       // mod to figure out which index we are at (0-5) for each particle
@@ -35,7 +35,7 @@ export const createFLIPKernel = (gpu, particleCount, cellSize) =>
       if (index_mod === 3) {
         // vx
         // get the lerp weight and return the lerp'd velocity
-        let lerpWeight = (pos_x - grid_lower_x) / this.constants.CELL_SIZE;
+        let lerpWeight = (pos_x - grid_lower_x * this.constants.CELL_SIZE) / this.constants.CELL_SIZE;
         return lerp(
           diffGridVx[grid_lower_x][grid_lower_y][grid_lower_z],
           diffGridVx[grid_upper_x][grid_lower_y][grid_lower_z],
@@ -44,16 +44,16 @@ export const createFLIPKernel = (gpu, particleCount, cellSize) =>
       } else if (index_mod === 4) {
         // vy
         // get the lerp weight and return the lerp'd velocity
-        let lerpWeight = (pos_y - grid_lower_y) / this.constants.CELL_SIZE;
+        let lerpWeight = (pos_y - grid_lower_y * this.constants.CELL_SIZE) / this.constants.CELL_SIZE;
         return lerp(
-          diffGridy[grid_lower_x][grid_lower_y][grid_lower_z],
+          diffGridVy[grid_lower_x][grid_lower_y][grid_lower_z],
           diffGridVy[grid_lower_x][grid_upper_y][grid_lower_z],
           lerpWeight
         );
       } else if (index_mod === 5) {
         // vz
         // get the lerp weight and return the lerp'd velocity
-        let lerpWeight = (pos_z - grid_lower_z) / this.constants.CELL_SIZE;
+        let lerpWeight = (pos_z - grid_lower_z * this.constants.CELL_SIZE) / this.constants.CELL_SIZE;
         return lerp(
           diffGridVz[grid_lower_x][grid_lower_y][grid_lower_z],
           diffGridVz[grid_lower_x][grid_lower_y][grid_upper_z],
@@ -67,12 +67,13 @@ export const createFLIPKernel = (gpu, particleCount, cellSize) =>
     .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT, CELL_SIZE: cellSize })
     .setOutput([particleCount * ATTRIBUTE_COUNT]);
 
-export const createUpdateVelocitiesKernel = (
+export const createGridToParticlesKernel = (
   gpu,
   particleCount,
   nx,
   ny,
-  nz
+  nz,
+  cellSize
 ) => {
   const velocityXDifference = createGridVelocityDifferenceKernel(
     gpu,
@@ -92,7 +93,7 @@ export const createUpdateVelocitiesKernel = (
     ny,
     nz + 1
   );
-  const flipKernel = createFLIPKernel(gpu, particleCount);
+  const flipKernel = createFLIPKernel(gpu, particleCount, cellSize);
   return gpu.combineKernels(
     velocityXDifference,
     velocityYDifference,
