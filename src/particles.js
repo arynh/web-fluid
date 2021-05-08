@@ -1,4 +1,4 @@
-const ATTRIBUTE_COUNT = 6;
+export const ATTRIBUTE_COUNT = 6;
 
 /**
  * Represent the particle cloud.
@@ -21,7 +21,7 @@ export class Particles {
     for (let x = bounds.min[0]; x < bounds.max[0]; x += gap_between) {
       for (let y = bounds.min[1]; y < bounds.max[1]; y += gap_between) {
         for (let z = bounds.min[2]; z < bounds.max[2]; z += gap_between) {
-          // push initial particle _
+          // push initial particle quantities
           this.particleBuffer.push(x); // initial position
           this.particleBuffer.push(y);
           this.particleBuffer.push(z);

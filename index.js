@@ -1,18 +1,24 @@
 import { GPU } from "gpu.js";
 import { vec3 } from "gl-matrix";
-import { createParticleToGridKernel } from "./src/simulation/transfer-particle-to-grid.js";
 import { Particles } from "./src/particles.js";
 import { MACGrid } from "./src/mac-grid.js";
+import { createAdvectParticlesKernel } from "./src/simulation/advect-particles.js";
+import { createParticleToGridKernel } from "./src/simulation/transfer-particle-to-grid.js";
+import { compileKernels } from "./src/simulation/kernels.js";
 
-// create one test particle with velocity <1,1,1>
-const particles = new Particles(10, {
+const particles = new Particles(1, {
   min: vec3.fromValues(0.0, 0.0, 0.0),
   max: vec3.fromValues(1.0, 1.0, 1.0),
 });
-console.log("particle buffer:");
+particles.particleBuffer[0] = 0.25;
+particles.particleBuffer[1] = 0.25;
+particles.particleBuffer[2] = 0.25;
+particles.particleBuffer[3] = 1;
+particles.particleBuffer[4] = 1;
+particles.particleBuffer[5] = 1;
+
+console.log("old particle buffer:");
 console.log(particles.particleBuffer);
-console.log("particle indices:");
-console.log(particles.particleIndices);
 
 // create MAC grid with one cell
 const grid = new MACGrid(
@@ -22,38 +28,8 @@ const grid = new MACGrid(
   },
   0.5
 );
-grid.addDefaultSolids();
-console.log("grid states:");
-console.log(grid.voxelStates);
+console.log(`created grid of size: (${grid.nx}, ${grid.ny}, ${grid.nz})`);
 
-const particleCount = particles.count();
-
+// compile kernels
 const gpu = new GPU();
-const particleToGridKernel = createParticleToGridKernel(
-  gpu,
-  particleCount,
-  grid.count[0],
-  grid.count[1] - 1,
-  grid.count[2] - 1
-);
-
-const newGridVelocitiesX = particleToGridKernel(
-  particles.particleBuffer,
-  grid.cellSize,
-  0
-);
-const newGridVelocitiesY = particleToGridKernel(
-  particles.particleBuffer,
-  grid.cellSize,
-  1
-);
-const newGridVelocitiesZ = particleToGridKernel(
-  particles.particleBuffer,
-  grid.cellSize,
-  2
-);
-
-console.log("\nnew grid velocities:");
-console.log(newGridVelocitiesX);
-console.log(newGridVelocitiesY);
-console.log(newGridVelocitiesZ);
+const kernels = compileKernels(gpu, particles, grid);

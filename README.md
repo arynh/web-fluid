@@ -16,7 +16,7 @@ For every simulation loop:
 - [ ] extrapolate velocity
 - [x] enforce boundary conditions
 - [ ] update the velocities of the particles
-- [ ] update the positions of the particles
+- [x] update the positions of the particles
 
 ## Installation
 
