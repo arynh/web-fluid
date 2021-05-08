@@ -12,7 +12,7 @@ export const createGridVelocityDifferenceKernel = (gpu, nx, ny, nz) =>
     .setOutput([nx, ny, nz]);
 
 // FLIP Kernel
-export const createFLIPKernel = (gpu, particleCount) =>
+export const createFLIPKernel = (gpu, particleCount, cellSize) =>
   gpu
     .createKernel(function (particles, diffGridVx, diffGridVy, diffGridVz) {
       // mod to figure out which index we are at (0-5) for each particle
@@ -26,16 +26,16 @@ export const createFLIPKernel = (gpu, particleCount) =>
       let pos_y = particles[this.thread.x - index_mod + 1];
       let pos_z = particles[this.thread.x - index_mod + 2];
       // get the lower and upper grid positions
-      let grid_lower_x = Math.floor(pos_x / this.constants.cellSize);
-      let grid_upper_x = Math.ceil(pos_x / this.constants.cellSize);
-      let grid_lower_y = Math.floor(pos_y / this.constants.cellSize);
-      let grid_upper_y = Math.ceil(pos_y / this.constants.cellSize);
-      let grid_lower_z = Math.floor(pos_z / this.constants.cellSize);
-      let grid_upper_z = Math.ceil(pos_z / this.constants.cellSize);
+      let grid_lower_x = Math.floor(pos_x / this.constants.CELL_SIZE);
+      let grid_upper_x = Math.ceil(pos_x / this.constants.CELL_SIZE);
+      let grid_lower_y = Math.floor(pos_y / this.constants.CELL_SIZE);
+      let grid_upper_y = Math.ceil(pos_y / this.constants.CELL_SIZE);
+      let grid_lower_z = Math.floor(pos_z / this.constants.CELL_SIZE);
+      let grid_upper_z = Math.ceil(pos_z / this.constants.CELL_SIZE);
       if (index_mod === 3) {
         // vx
         // get the lerp weight and return the lerp'd velocity
-        let lerpWeight = (pos_x - grid_lower_x) / this.constants.cellSize;
+        let lerpWeight = (pos_x - grid_lower_x) / this.constants.CELL_SIZE;
         return lerp(
           diffGridVx[grid_lower_x][grid_lower_y][grid_lower_z],
           diffGridVx[grid_upper_x][grid_lower_y][grid_lower_z],
@@ -44,7 +44,7 @@ export const createFLIPKernel = (gpu, particleCount) =>
       } else if (index_mod === 4) {
         // vy
         // get the lerp weight and return the lerp'd velocity
-        let lerpWeight = (pos_y - grid_lower_y) / this.constants.cellSize;
+        let lerpWeight = (pos_y - grid_lower_y) / this.constants.CELL_SIZE;
         return lerp(
           diffGridy[grid_lower_x][grid_lower_y][grid_lower_z],
           diffGridVy[grid_lower_x][grid_upper_y][grid_lower_z],
@@ -53,7 +53,7 @@ export const createFLIPKernel = (gpu, particleCount) =>
       } else if (index_mod === 5) {
         // vz
         // get the lerp weight and return the lerp'd velocity
-        let lerpWeight = (pos_z - grid_lower_z) / this.constants.cellSize;
+        let lerpWeight = (pos_z - grid_lower_z) / this.constants.CELL_SIZE;
         return lerp(
           diffGridVz[grid_lower_x][grid_lower_y][grid_lower_z],
           diffGridVz[grid_lower_x][grid_lower_y][grid_upper_z],
@@ -64,7 +64,7 @@ export const createFLIPKernel = (gpu, particleCount) =>
     .addFunction(function lerp(a, b, t) {
       return t * a + (1 - t) * b;
     })
-    .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT, cellSize: cellSize })
+    .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT, CELL_SIZE: cellSize })
     .setOutput([particleCount * ATTRIBUTE_COUNT]);
 
 export const createUpdateVelocitiesKernel = (

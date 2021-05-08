@@ -1,14 +1,10 @@
 import { ATTRIBUTE_COUNT } from "../particles.js";
 
-export const createAdvectParticlesKernel = (gpu, particleCount) =>
+export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
   gpu
-    .addFunction(function lerp(a, b, t) {
-      return t * a + (1 - t) * b;
-    })
     .createKernel(function (
       particles,
       dt,
-      cellSize,
       velocityFieldX,
       velocityFieldY,
       velocityFieldZ
@@ -28,14 +24,16 @@ export const createAdvectParticlesKernel = (gpu, particleCount) =>
         let xIntermediate = x + k1 / 2;
 
         // interpolate the velocity at the intermediate x value
-        let lerpWeight = (xIntermediate - Math.floor(xIntermediate)) / cellSize;
+        let lerpWeight =
+          (xIntermediate - Math.floor(xIntermediate)) /
+          this.constants.CELL_SIZE;
         let vxIntermediate = lerp(
-          velocityFieldX[Math.floor(xIntermediate / cellSize)][
-            Math.floor(y / cellSize)
-          ][Math.floor(z / cellSize)],
-          velocityFieldX[Math.ceil(xIntermediate / cellSize)][
-            Math.floor(y / cellSize)
-          ][Math.floor(z / cellSize)],
+          velocityFieldX[Math.floor(xIntermediate / this.constants.CELL_SIZE)][
+            Math.floor(y / this.constants.CELL_SIZE)
+          ][Math.floor(z / this.constants.CELL_SIZE)],
+          velocityFieldX[Math.ceil(xIntermediate / this.constants.CELL_SIZE)][
+            Math.floor(y / this.constants.CELL_SIZE)
+          ][Math.floor(z / this.constants.CELL_SIZE)],
           lerpWeight
         );
         let k2 = dt * vxIntermediate;
@@ -54,14 +52,16 @@ export const createAdvectParticlesKernel = (gpu, particleCount) =>
         let yIntermediate = y + k1 / 2;
 
         // interpolate the velocity at the intermediate y value
-        let lerpWeight = (yIntermediate - Math.floor(yIntermediate)) / cellSize;
+        let lerpWeight =
+          (yIntermediate - Math.floor(yIntermediate)) /
+          this.constants.CELL_SIZE;
         let vyIntermediate = lerp(
-          velocityFieldY[Math.floor(x / cellSize)][
-            Math.floor(yIntermediate / cellSize)
-          ][Math.floor(z / cellSize)],
-          velocityFieldY[Math.floor(x / cellSize)][
-            Math.ceil(yIntermediate / cellSize)
-          ][Math.floor(z / cellSize)],
+          velocityFieldY[Math.floor(x / this.constants.CELL_SIZE)][
+            Math.floor(yIntermediate / this.constants.CELL_SIZE)
+          ][Math.floor(z / this.constants.CELL_SIZE)],
+          velocityFieldY[Math.floor(x / this.constants.CELL_SIZE)][
+            Math.ceil(yIntermediate / this.constants.CELL_SIZE)
+          ][Math.floor(z / this.constants.CELL_SIZE)],
           lerpWeight
         );
         let k2 = dt * vyIntermediate;
@@ -80,14 +80,16 @@ export const createAdvectParticlesKernel = (gpu, particleCount) =>
         let zIntermediate = z + k1 / 2;
 
         // interpolate the velocity at the intermediate z value
-        let lerpWeight = (zIntermediate - Math.floor(zIntermediate)) / cellSize;
+        let lerpWeight =
+          (zIntermediate - Math.floor(zIntermediate)) /
+          this.constants.CELL_SIZE;
         let vzIntermediate = lerp(
-          velocityFieldZ[Math.floor(x / cellSize)][Math.floor(y / cellSize)][
-            Math.floor(zIntermediate / cellSize)
-          ],
-          velocityFieldZ[Math.floor(x / cellSize)][Math.floor(y / cellSize)][
-            Math.ceil(zIntermediate / cellSize)
-          ],
+          velocityFieldZ[Math.floor(x / this.constants.CELL_SIZE)][
+            Math.floor(y / this.constants.CELL_SIZE)
+          ][Math.floor(zIntermediate / this.constants.CELL_SIZE)],
+          velocityFieldZ[Math.floor(x / this.constants.CELL_SIZE)][
+            Math.floor(y / this.constants.CELL_SIZE)
+          ][Math.ceil(zIntermediate / this.constants.CELL_SIZE)],
           lerpWeight
         );
         let k2 = dt * vzIntermediate;
@@ -97,5 +99,8 @@ export const createAdvectParticlesKernel = (gpu, particleCount) =>
         return particles[this.thread.x];
       }
     })
-    .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT })
+    .addFunction(function lerp(a, b, t) {
+      return t * a + (1 - t) * b;
+    })
+    .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT, CELL_SIZE: cellSize })
     .setOutput([ATTRIBUTE_COUNT * particleCount]);
