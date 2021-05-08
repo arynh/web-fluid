@@ -100,7 +100,7 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
       }
     })
     .addFunction(function lerp(a, b, t) {
-      return t * a + (1 - t) * b;
+      return (1 - t) * a + t * b;
     })
     .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT, CELL_SIZE: cellSize })
     .setOutput([ATTRIBUTE_COUNT * particleCount]);

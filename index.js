@@ -13,9 +13,9 @@ const particles = new Particles(1, {
 particles.particleBuffer[0] = 0.25;
 particles.particleBuffer[1] = 0.25;
 particles.particleBuffer[2] = 0.25;
-particles.particleBuffer[3] = 1;
-particles.particleBuffer[4] = 1;
-particles.particleBuffer[5] = 1;
+particles.particleBuffer[3] = 0;
+particles.particleBuffer[4] = 0;
+particles.particleBuffer[5] = 0;
 
 console.log("old particle buffer:");
 console.log(particles.particleBuffer);
