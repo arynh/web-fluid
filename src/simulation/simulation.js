@@ -2,6 +2,8 @@ import { MACGrid } from "../mac-grid.js";
 import { Particles } from "../particles.js";
 import { compileKernels } from "./kernels.js";
 
+export const FLUID_DENSITY = 997; // kg/m^3
+
 export class Simulation {
   constructor(gpu, config) {
     this.particles = new Particles(

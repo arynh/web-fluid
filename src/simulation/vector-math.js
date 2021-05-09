@@ -3,7 +3,6 @@
  */
 const createMatrixVectorProductKernel = (gpu, vectorLength) =>
   gpu
-    .setTactic("precision") // vector math should be high precision
     .createKernel(function (A, x) {
       let sum = 0;
       for (let i = 0; i < this.constants.vectorLength; i++) {
@@ -11,5 +10,6 @@ const createMatrixVectorProductKernel = (gpu, vectorLength) =>
       }
       return sum;
     })
+    .setTactic("precision") // vector math should be high precision
     .setConstants({ vectorLength: vectorLength })
     .setOutput([vectorLength]);
