@@ -14,16 +14,16 @@
  *      - add velocity * weight
  *      - where weight is given as triangle function
  */
-export const createParticleToGridKernel = (gpu, particleCount, nx, ny, nz) =>
+export const createParticleToGridKernel = (
+  gpu,
+  particleCount,
+  nx,
+  ny,
+  nz,
+  dimension
+) =>
   gpu
-    .addFunction(function triangle(r) {
-      let r_magnitude = Math.abs(r);
-      if (r_magnitude >= 1) {
-        return 0;
-      }
-      return 1 - r_magnitude;
-    })
-    .createKernel(function (particles, cellSize, dimension) {
+    .createKernel(function (particles, cellSize) {
       // get spatial location of grid velocity vector
       let x = cellSize * this.thread.x;
       let y = cellSize * this.thread.y;
@@ -36,7 +36,7 @@ export const createParticleToGridKernel = (gpu, particleCount, nx, ny, nz) =>
          velocity contribution to the grid velocity */
       for (
         let particleIndex = 0;
-        particleIndex < this.constants.particleCount;
+        particleIndex < this.constants.PARTICLE_COUNT;
         particleIndex++
       ) {
         // calculate distance in each dimension
@@ -59,7 +59,8 @@ export const createParticleToGridKernel = (gpu, particleCount, nx, ny, nz) =>
           triangle(distance_y / cellSize) *
           triangle(distance_z / cellSize);
 
-        numerator += particles[particleIndex * 6 + 3 + dimension] * weight;
+        numerator +=
+          particles[particleIndex * 6 + 3 + this.constants.DIMENSION] * weight;
         denominator += weight;
       }
 
@@ -69,5 +70,12 @@ export const createParticleToGridKernel = (gpu, particleCount, nx, ny, nz) =>
       }
       return numerator / denominator;
     })
-    .setConstants({ particleCount: particleCount })
+    .addFunction(function triangle(r) {
+      let r_magnitude = Math.abs(r);
+      if (r_magnitude >= 1) {
+        return 0;
+      }
+      return 1 - r_magnitude;
+    })
+    .setConstants({ PARTICLE_COUNT: particleCount, DIMENSION: dimension })
     .setOutput([nx, ny, nz]);

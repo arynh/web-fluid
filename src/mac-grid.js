@@ -49,12 +49,20 @@ export class MACGrid {
     this.ny = this.count[1] - 1;
     this.nz = this.count[2] - 1;
     this.pressure = initialize3DArray(this.nx, this.ny, this.nz);
-    this.velocity_x = initialize3DArray(this.nx + 1, this.ny, this.nz);
-    this.velocity_y = initialize3DArray(this.nx, this.ny + 1, this.nz);
-    this.velocity_z = initialize3DArray(this.nx, this.ny, this.nz + 1);
+    this.pressureOld = null;
+    this.velocityX = initialize3DArray(this.nx + 1, this.ny, this.nz);
+    this.velocityXOld = null;
+    this.velocityZ = initialize3DArray(this.nx, this.ny + 1, this.nz);
+    this.velocityYOld = null;
+    this.velocityZ = initialize3DArray(this.nx, this.ny, this.nz + 1);
+    this.velocityZOld = null;
 
     // initialize voxel states
     this.voxelStates = initialize3DArray(this.nx, this.ny, this.nz);
+
+    console.log(
+      `Created a MAC grid with dimensions (${this.nx}, ${this.ny}, ${this.nz}).`
+    );
   }
 
   /**

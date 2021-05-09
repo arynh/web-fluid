@@ -25,7 +25,8 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
 
         // interpolate the velocity at the intermediate x value
         let lerpWeight =
-          (xIntermediate - Math.floor(xIntermediate) * this.constants.CELL_SIZE) /
+          (xIntermediate -
+            Math.floor(xIntermediate) * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         let vxIntermediate = lerp(
           velocityFieldX[Math.floor(xIntermediate / this.constants.CELL_SIZE)][
@@ -53,7 +54,8 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
 
         // interpolate the velocity at the intermediate y value
         let lerpWeight =
-          (yIntermediate - Math.floor(yIntermediate) * this.constants.CELL_SIZE) /
+          (yIntermediate -
+            Math.floor(yIntermediate) * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         let vyIntermediate = lerp(
           velocityFieldY[Math.floor(x / this.constants.CELL_SIZE)][
@@ -81,7 +83,8 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
 
         // interpolate the velocity at the intermediate z value
         let lerpWeight =
-          (zIntermediate - Math.floor(zIntermediate) * this.constants.CELL_SIZE) /
+          (zIntermediate -
+            Math.floor(zIntermediate) * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         let vzIntermediate = lerp(
           velocityFieldZ[Math.floor(x / this.constants.CELL_SIZE)][

@@ -8,8 +8,7 @@ import {
   createEnforceBoundaryZKernel,
 } from "./enforce-boundary-conditions.js";
 import { createParticleToGridKernel } from "./transfer-particle-to-grid.js";
-import { createClearGridKernel } from "./clear-grid-velocities.js";
-import { createGridToParticlesKernel } from "./flip.js";
+import { createGridToParticlesKernel } from "./transfer-grid-to-particles.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
@@ -23,17 +22,20 @@ export const compileKernels = (gpu, particles, grid) => {
   const particleToXGrid = createParticleToGridKernel(
     gpu,
     particles.count(),
-    ...velocityXSize
+    ...velocityXSize,
+    0
   );
   const particleToYGrid = createParticleToGridKernel(
     gpu,
     particles.count(),
-    ...velocityYSize
+    ...velocityYSize,
+    1
   );
   const particleToZGrid = createParticleToGridKernel(
     gpu,
     particles.count(),
-    ...velocityZSize
+    ...velocityZSize,
+    2
   );
 
   // copy grid quantities to save
@@ -61,10 +63,19 @@ export const compileKernels = (gpu, particles, grid) => {
   // TODO: implement these kernels
 
   // update the velocities of the particles using PIC/FLIP
-  const gridToParticles = createGridToParticlesKernel(gpu, particles.count(), ...gridSize, grid.cellSize);
+  const gridToParticles = createGridToParticlesKernel(
+    gpu,
+    particles.count(),
+    ...gridSize,
+    grid.cellSize
+  );
 
   // update the positions of the particles
-  const advectParticles = createAdvectParticlesKernel(gpu, particles.count());
+  const advectParticles = createAdvectParticlesKernel(
+    gpu,
+    particles.count(),
+    grid.cellSize
+  );
 
   const end = Date.now();
   console.log(`Kernels compiled in ${end - start} ms.`);
