@@ -20,7 +20,7 @@ const solve = (
   // follow PCG algorithm set out in Bridson
   let p = kernels.zeroVector();
   let r = d;
-  let z = applyPreconditioner(r); // TODO: implement the preconditioner.
+  let z = r; // applyPreconditioner(r); // TODO: implement the preconditioner.
   let s = z;
   let sigma = kernels.math.dot(z, r);
 
@@ -46,7 +46,7 @@ const solve = (
       return p;
     }
 
-    z = applyPreconditioner(r);
+    z = r; // applyPreconditioner(r); // TODO: implement the preconditioner
 
     // sigma' <- z dot r
     let _sigma = kernels.math.dot(z, r);
@@ -68,8 +68,5 @@ const solve = (
   return p;
 };
 
-const checkResidual = (r, tolerance) => {
-  return error(r) <= tolerance;
-};
-
+const checkResidual = (r, tolerance) => error(r) <= tolerance;
 const error = (r) => r.reduce((max, n) => Math.max(max, Math.abs(n)), -1);
