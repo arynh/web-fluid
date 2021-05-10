@@ -1,6 +1,6 @@
 import { MACGrid } from "../mac-grid.js";
-import { Particles } from "../particles.js";
-import { compileKernels } from "./kernels.js";
+import { Particles } from "./particles.js";
+import { compileKernels } from "./kernels/kernels.js";
 
 export const FLUID_DENSITY = 997; // kg/m^3
 

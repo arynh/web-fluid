@@ -1,5 +1,5 @@
-import { FLUID_DENSITY } from "./simulation.js";
-import { STATE_ENUM } from "../mac-grid.js";
+import { FLUID_DENSITY } from "../simulation.js";
+import { STATE_ENUM } from "../../mac-grid.js";
 
 /**
  * Assumption!
