@@ -81,19 +81,19 @@ export const compileKernels = (gpu, particles, grid) => {
   console.log(`Kernels compiled in ${end - start} ms.`);
 
   return {
-    particleToXGrid: particleToXGrid,
-    particleToYGrid: particleToYGrid,
-    particleToZGrid: particleToZGrid,
-    copyPressure: copyPressure,
-    copyXVelocity: copyXVelocity,
-    copyYVelocity: copyYVelocity,
-    copyZVelocity: copyZVelocity,
-    classifyVoxels: classifyVoxels,
-    addGravity: addGravity,
-    enforceXBoundary: enforceXBoundary,
-    enforceYBoundary: enforceYBoundary,
-    enforceZBoundary: enforceZBoundary,
+    particleToXGrid: particleToXGrid.setPipeline(true),
+    particleToYGrid: particleToYGrid.setPipeline(true),
+    particleToZGrid: particleToZGrid.setPipeline(true),
+    copyPressure: copyPressure.setPipeline(true),
+    copyXVelocity: copyXVelocity.setPipeline(true),
+    copyYVelocity: copyYVelocity.setPipeline(true),
+    copyZVelocity: copyZVelocity.setPipeline(true),
+    classifyVoxels: classifyVoxels.setPipeline(true),
+    addGravity: addGravity.setPipeline(true),
+    enforceXBoundary: enforceXBoundary.setPipeline(true),
+    enforceYBoundary: enforceYBoundary.setPipeline(true),
+    enforceZBoundary: enforceZBoundary.setPipeline(true),
     gridToParticles: gridToParticles,
-    advectParticles: advectParticles,
+    advectParticles: advectParticles.setPipeline(true),
   };
 };

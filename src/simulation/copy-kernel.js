@@ -1,6 +1,6 @@
 export const createCopyKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (array) {
-      return array[this.thread.x][this.thread.y][this.thread.z];
+      return array[this.thread.z][this.thread.y][this.thread.x];
     })
     .setOutput([nx, ny, nz]);

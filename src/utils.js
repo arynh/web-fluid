@@ -14,5 +14,6 @@ export const initialize3DArray = (x, y, z) => {
       a[i].push(new Float32Array(z));
     }
   }
+  a.toArray = function() {return this;}
   return a;
 };

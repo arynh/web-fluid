@@ -30,7 +30,7 @@ export const createClassifyVoxelsKernel = (gpu, particleCount, nx, ny, nz) =>
       // any cell without a particle or solid is air
       if (particle_exists) {
         if (
-          voxelStates[this.thread.x][this.thread.y][this.thread.z] !==
+          voxelStates[this.thread.z][this.thread.y][this.thread.x] !==
           this.constants.SOLID
         ) {
           return this.constants.FLUID;
@@ -40,7 +40,7 @@ export const createClassifyVoxelsKernel = (gpu, particleCount, nx, ny, nz) =>
       } else {
         // if there isn't, and the state is fluid, flip it to air
         if (
-          voxelStates[this.thread.x][this.thread.y][this.thread.z] !==
+          voxelStates[this.thread.z][this.thread.y][this.thread.x] !==
           this.constants.SOLID
         ) {
           return this.constants.AIR;

@@ -1,6 +1,5 @@
-import { GPU } from "gpu.js";
 import { vec3 } from "gl-matrix";
-import { Simulation } from "./src/simulation/simulation.js";
+import { Simulation } from "./simulation/simulation.js";
 
 // create GPU
 const gpu = new GPU();

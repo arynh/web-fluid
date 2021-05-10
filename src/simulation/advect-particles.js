@@ -29,12 +29,12 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
             Math.floor(xIntermediate) * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         let vxIntermediate = lerp(
-          velocityFieldX[Math.floor(xIntermediate / this.constants.CELL_SIZE)][
+          velocityFieldX[Math.floor(z / this.constants.CELL_SIZE)][
             Math.floor(y / this.constants.CELL_SIZE)
-          ][Math.floor(z / this.constants.CELL_SIZE)],
-          velocityFieldX[Math.ceil(xIntermediate / this.constants.CELL_SIZE)][
+          ][Math.floor(xIntermediate / this.constants.CELL_SIZE)],
+          velocityFieldX[Math.floor(z / this.constants.CELL_SIZE)][
             Math.floor(y / this.constants.CELL_SIZE)
-          ][Math.floor(z / this.constants.CELL_SIZE)],
+          ][Math.ceil(xIntermediate / this.constants.CELL_SIZE)],
           lerpWeight
         );
         let k2 = dt * vxIntermediate;
@@ -58,12 +58,12 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
             Math.floor(yIntermediate) * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         let vyIntermediate = lerp(
-          velocityFieldY[Math.floor(x / this.constants.CELL_SIZE)][
+          velocityFieldY[Math.floor(z / this.constants.CELL_SIZE)][
             Math.floor(yIntermediate / this.constants.CELL_SIZE)
-          ][Math.floor(z / this.constants.CELL_SIZE)],
-          velocityFieldY[Math.floor(x / this.constants.CELL_SIZE)][
+          ][Math.floor(x / this.constants.CELL_SIZE)],
+          velocityFieldY[Math.floor(z / this.constants.CELL_SIZE)][
             Math.ceil(yIntermediate / this.constants.CELL_SIZE)
-          ][Math.floor(z / this.constants.CELL_SIZE)],
+          ][Math.floor(x / this.constants.CELL_SIZE)],
           lerpWeight
         );
         let k2 = dt * vyIntermediate;
@@ -87,12 +87,12 @@ export const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
             Math.floor(zIntermediate) * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         let vzIntermediate = lerp(
-          velocityFieldZ[Math.floor(x / this.constants.CELL_SIZE)][
+          velocityFieldZ[Math.floor(zIntermediate / this.constants.CELL_SIZE)][
             Math.floor(y / this.constants.CELL_SIZE)
-          ][Math.floor(zIntermediate / this.constants.CELL_SIZE)],
-          velocityFieldZ[Math.floor(x / this.constants.CELL_SIZE)][
+          ][Math.floor(x / this.constants.CELL_SIZE)],
+          velocityFieldZ[Math.ceil(zIntermediate / this.constants.CELL_SIZE)][
             Math.floor(y / this.constants.CELL_SIZE)
-          ][Math.ceil(zIntermediate / this.constants.CELL_SIZE)],
+          ][Math.floor(x / this.constants.CELL_SIZE)],
           lerpWeight
         );
         let k2 = dt * vzIntermediate;
