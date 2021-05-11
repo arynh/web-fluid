@@ -1404,7 +1404,7 @@
    * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    */
 
-  function RayMarchingEffect(resolution) {
+  function RayMarchingEffect(resolution, density) {
     var ext = gl.getExtension("OES_texture_float");
     if (!ext) {
       alert("this machine or browser does not support OES_texture_float");
@@ -1440,7 +1440,7 @@
 
     const gpu = new GPU();
     const sim = new Simulation(gpu, {
-      particleDensity: 10000,
+      particleDensity: density,
       particleBounds: {
         min: fromValues(0.3, 0.3, 0.3),
         max: fromValues(0.7, 0.7, 0.7),
@@ -1486,7 +1486,7 @@
       .setOutput([max_tex_dim * 4]);
 
     const smooth = gpu
-      .createKernel(function (field, size) {
+      .createKernel(function (field, size, coefficient) {
         let z_c = Math.floor(this.thread.x / (size * size));
         let y_c = Math.floor(this.thread.x / size) % size;
         let x_c = this.thread.x % size;
@@ -1501,10 +1501,10 @@
               let y = y_c + y_o;
               let z = z_c + z_o;
 
-              // Weighted by e^(-c * r^2)
+              // Weighted by e^(-r^2 / c)
               let w = Math.pow(
                 2.71,
-                -1.5 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o)
+                -1 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o) / coefficient
               );
 
               if (
@@ -1559,7 +1559,7 @@
 
       {
         // Set firstDraw = false to only draw 1 frame
-        
+
         // Sine wave water
         /*
         let balls = [];
@@ -1579,7 +1579,8 @@
         */
 
         let balls = [];
-        let radius = 0.04;
+        //let radius = 0.04;
+        let radius = window.radiusSlider.value / 100;
         for (let i = 0; i < sim.particles.particleBuffer.length; i += 6) {
           balls.push([
             sim.particles.particleBuffer[i],
@@ -1592,7 +1593,8 @@
         //field = fillField(balls, balls.length, size, radius).toArray();
         field = smooth(
           fillField(balls, balls.length, size, radius),
-          size
+          size,
+          Math.max(0.001, window.smoothSlider.value)
         ).toArray();
       }
 
