@@ -101,10 +101,10 @@ export const compileKernels = (gpu, particles, grid) => {
   const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
   const applyA = createApplyAKernel(gpu, pcgVectorLength);
   const math = {
-    componentWiseAdd: componentWiseAdd,
+    componentWiseAdd: componentWiseAdd.setPipeline(true),
     dot: dot,
-    scalarMultiply: scalarMultiply,
-    applyA: applyA,
+    scalarMultiply: scalarMultiply.setPipeline(true),
+    applyA: applyA.setPipeline(true),
   };
 
   // PCG methods
@@ -115,13 +115,13 @@ export const compileKernels = (gpu, particles, grid) => {
     .setOutput([pcgVectorLength]);
 
   const pressureSolve = {
-    buildADiag: buildADiag,
-    buildAX: buildAX,
-    buildAY: buildAY,
-    buildAZ: buildAZ,
-    buildD: buildD,
+    buildADiag: buildADiag.setPipeline(true),
+    buildAX: buildAX.setPipeline(true),
+    buildAY: buildAY.setPipeline(true),
+    buildAZ: buildAZ.setPipeline(true),
+    buildD: buildD.setPipeline(true),
     math: math,
-    zeroVector: zeroVector,
+    zeroVector: zeroVector.setPipeline(true),
   };
 
   // update the velocities of the particles using PIC/FLIP

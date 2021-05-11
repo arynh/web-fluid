@@ -87,44 +87,26 @@ export const createGridToParticlesKernel = (
     ny,
     nz
   ).setPipeline(true);
+
   const velocityYDifference = createGridVelocityDifferenceKernel(
     gpu,
     nx,
     ny + 1,
     nz
   ).setPipeline(true);
+
   const velocityZDifference = createGridVelocityDifferenceKernel(
     gpu,
     nx,
     ny,
     nz + 1
   ).setPipeline(true);
+
   const flipKernel = createFLIPKernel(gpu, particleCount, cellSize).setPipeline(
     true
   );
-  /*return gpu.combineKernels(
-    velocityXDifference,
-    velocityYDifference,
-    velocityZDifference,
-    flipKernel,
-    function (
-      oldXVelocity,
-      oldYVelocity,
-      oldZVelocity,
-      newXVelocity,
-      newYVelocity,
-      newZVelocity,
-      particles
-    ) {
-      return flipKernel(
-        particles,
-        velocityXDifference(oldXVelocity, newXVelocity),
-        velocityYDifference(oldYVelocity, newYVelocity),
-        velocityZDifference(oldZVelocity, newZVelocity)
-      );
-    }
-  );*/
-  return function (
+
+  return (
     oldXVelocity,
     oldYVelocity,
     oldZVelocity,
@@ -132,12 +114,11 @@ export const createGridToParticlesKernel = (
     newYVelocity,
     newZVelocity,
     particles
-  ) {
-    return flipKernel(
+  ) =>
+    flipKernel(
       particles,
       velocityXDifference(oldXVelocity, newXVelocity),
       velocityYDifference(oldYVelocity, newYVelocity),
       velocityZDifference(oldZVelocity, newZVelocity)
     );
-  };
 };
