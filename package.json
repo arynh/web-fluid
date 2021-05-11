@@ -1,18 +1,21 @@
 {
-  "name": "web-fluid",
-  "version": "1.0.0",
-  "description": "A web-based, 3D, real-time fluid simulation.",
-  "main": "index.js",
-  "repository": "https://github.com/arynh/web-fluid.git",
-  "author": "Aryn Harmon <harmon.aryn@gmail.com>",
-  "license": "MIT",
-  "dependencies": {
-    "gl-matrix": "^3.3.0",
-    "gpu.js": "^2.11.3",
-    "http-server": "^0.12.3"
+  "name": "rollup-starter-app",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^17.0.0",
+    "@rollup/plugin-node-resolve": "^11.1.0",
+    "npm-run-all": "^4.1.5",
+    "rollup": "^2.36.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "serve": "^11.3.2"
   },
-  "type": "module",
+  "dependencies": {
+    "date-fns": "^2.16.1",
+    "gl-matrix": "^3.3.0"
+  },
   "scripts": {
-    "start": "http-server"
+    "build": "rollup -c",
+    "watch": "rollup -c -w",
+    "dev": "npm-run-all --parallel start watch",
+    "start": "serve public"
   }
 }

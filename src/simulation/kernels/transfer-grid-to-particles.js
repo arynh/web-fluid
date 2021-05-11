@@ -5,8 +5,8 @@ const createGridVelocityDifferenceKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (oldVelocities, newVelocities) {
       return (
-        newVelocities[this.thread.x][this.thread.y][this.thread.z] -
-        oldVelocities[this.thread.x][this.thread.y][this.thread.z]
+        newVelocities[this.thread.z][this.thread.y][this.thread.x] -
+        oldVelocities[this.thread.z][this.thread.y][this.thread.x]
       );
     })
     .setOutput([nx, ny, nz]);
@@ -39,8 +39,8 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
           (pos_x - grid_lower_x * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         return lerp(
-          diffGridVx[grid_lower_x][grid_lower_y][grid_lower_z],
-          diffGridVx[grid_upper_x][grid_lower_y][grid_lower_z],
+          diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x],
+          diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x],
           lerpWeight
         );
       } else if (index_mod === 4) {
@@ -50,8 +50,8 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
           (pos_y - grid_lower_y * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         return lerp(
-          diffGridVy[grid_lower_x][grid_lower_y][grid_lower_z],
-          diffGridVy[grid_lower_x][grid_upper_y][grid_lower_z],
+          diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x],
+          diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x],
           lerpWeight
         );
       } else if (index_mod === 5) {
@@ -61,8 +61,8 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
           (pos_z - grid_lower_z * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         return lerp(
-          diffGridVz[grid_lower_x][grid_lower_y][grid_lower_z],
-          diffGridVz[grid_lower_x][grid_lower_y][grid_upper_z],
+          diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x],
+          diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x],
           lerpWeight
         );
       }
@@ -86,21 +86,23 @@ export const createGridToParticlesKernel = (
     nx + 1,
     ny,
     nz
-  );
+  ).setPipeline(true);
   const velocityYDifference = createGridVelocityDifferenceKernel(
     gpu,
     nx,
     ny + 1,
     nz
-  );
+  ).setPipeline(true);
   const velocityZDifference = createGridVelocityDifferenceKernel(
     gpu,
     nx,
     ny,
     nz + 1
+  ).setPipeline(true);
+  const flipKernel = createFLIPKernel(gpu, particleCount, cellSize).setPipeline(
+    true
   );
-  const flipKernel = createFLIPKernel(gpu, particleCount, cellSize);
-  return gpu.combineKernels(
+  /*return gpu.combineKernels(
     velocityXDifference,
     velocityYDifference,
     velocityZDifference,
@@ -121,5 +123,21 @@ export const createGridToParticlesKernel = (
         velocityZDifference(oldZVelocity, newZVelocity)
       );
     }
-  );
+  );*/
+  return function (
+    oldXVelocity,
+    oldYVelocity,
+    oldZVelocity,
+    newXVelocity,
+    newYVelocity,
+    newZVelocity,
+    particles
+  ) {
+    return flipKernel(
+      particles,
+      velocityXDifference(oldXVelocity, newXVelocity),
+      velocityYDifference(oldYVelocity, newYVelocity),
+      velocityZDifference(oldZVelocity, newZVelocity)
+    );
+  };
 };
