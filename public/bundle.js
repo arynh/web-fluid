@@ -1305,9 +1305,7 @@
 
     step(dt) {
       let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
-      console.log("SIM START");
       // transfer particle velocities to the grid and interpolate
-      console.log(this.particles.particleBuffer);
       this.grid.velocityX = this.kernels.particleToXGrid(
         particleBufferCopy,
         this.grid.cellSize
@@ -1406,7 +1404,7 @@
    * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    */
 
-  function MarchingCubesEffect(resolution) {
+  function RayMarchingEffect(resolution) {
     var ext = gl.getExtension("OES_texture_float");
     if (!ext) {
       alert("this machine or browser does not support OES_texture_float");
@@ -1417,27 +1415,17 @@
     var program = tdl.programs.loadProgramFromScriptTags("ray_vs", "ray_fs");
     var textures = [new tdl.textures.ExternalTexture2D()];
 
-    var view = new Float32Array(16);
-
     var model = new tdl.models.Model(program, arrays, textures);
 
-    var eyePosition = new Float32Array([0, 1, 2.1]);
-    var target = new Float32Array([0, 0, 0]);
-
-    // Size of field. 32 is pushing it in Javascript :)
     var size = resolution;
+
     var size3 = size * size * size;
     var max_tex_dim = 16384;
     if (size3 > max_tex_dim * 4) {
       alert("Resolution too high! Something's wrong.");
     }
 
-    //var array = cArray(max_tex_dim * 4);
-
-    //var field = array.data
     var field = new Float32Array(max_tex_dim * 4);
-
-    var m4 = tdl.fast.matrix4;
 
     var tex = textures[0].texture;
     var tex_level = 0;
@@ -1447,8 +1435,6 @@
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-
-    m4.lookAt(view, eyePosition, target, up);
     var startTime = Date.now() / 1000;
     var lastTime = startTime;
 
@@ -1487,12 +1473,11 @@
           }
         }
 
-        //field[y_offset + x] = sphereSDF(x_w - balls[closest][0], y_w - balls[closest][1], z_w - balls[closest][2], radius);
         return (
           Math.sqrt(
             (x_w - balls[closest][0]) * (x_w - balls[closest][0]) +
-              (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
-              (z_w - balls[closest][2]) * (z_w - balls[closest][2])
+            (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
+            (z_w - balls[closest][2]) * (z_w - balls[closest][2])
           ) - radius
         );
       })
@@ -1516,6 +1501,7 @@
               let y = y_c + y_o;
               let z = z_c + z_o;
 
+              // Weighted by e^(-c * r^2)
               let w = Math.pow(
                 2.71,
                 -1.5 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o)
@@ -1533,8 +1519,6 @@
                 w = 0.0;
               }
 
-              //let w = x_o == 0 && y_o == 0 && z_o == 0 ? 1.0 : 0.0;
-
               sum += field[z * size * size + y * size + x] * w;
               count += w;
             }
@@ -1546,14 +1530,7 @@
       .setPipeline(true)
       .setOutput([max_tex_dim * 4]);
 
-    this.render = function (framebuffer, time, numblobs) {
-      /*m4.perspective(proj, tdl.math.degToRad(60), aspect, 0.1, 500);
-      m4.rotationY(world, 0);//time * 0.5)
-      m4.translate(world, [0, 0, 0])
-      m4.mul(viewproj, view, proj)
-      m4.mul(worldview, world, view)
-      m4.mul(worldviewproj, world, viewproj)*/
-
+    this.render = function () {
       gl.clearColor(0.0, 0.0, 0.0, 1);
       gl.clearDepth(1.0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -1574,13 +1551,6 @@
       sim.step(deltaTime);
 
       var uniformsConst = {
-        //u_worldviewproj: worldviewproj,
-        //u_worldview: worldview,
-        //u_world: world,
-        //u_lightDir: [-1.0, 1.0, 1.0],
-        //u_lightColor: [116 / 255.0, 204 / 255.0, 244 / 255.0, 1.0],
-        //u_ambientUp: [35 / 255.0 * 0.5, 137 / 255.0 * 0.5, 218 / 255.0 * 0.5, 1.0],
-        //u_ambientDown: [15 / 255.0 * 0.5, 94 / 255.0 * 0.5, 156 / 255.0 * 0.5, 1.0],
         u_field: textures[0],
         time: localTime,
       };
@@ -1588,11 +1558,9 @@
       model.drawPrep(uniformsConst);
 
       {
-        // Uncomment to check the speed impact of the field filling.
-        //firstDraw = false
-        //for (var i = 0; i < size * size * size; i++) {
-        // field[i] = 100000.0
-        //}
+        // Set firstDraw = false to only draw 1 frame
+        
+        // Sine wave water
         /*
         let balls = [];
         let n = 30;
@@ -1607,7 +1575,8 @@
             let y = 0.3 * Math.pow(Math.cos(10 * r - 1 * time), 2) / Math.max(10*r, 0.5) + 0.05;
             balls.push([xp, y, zp]);
           }
-        }*/
+        }
+        */
 
         let balls = [];
         let radius = 0.04;
@@ -1618,42 +1587,17 @@
             sim.particles.particleBuffer[i + 2],
           ]);
         }
+
+        // Swap comment to see with / without smoothing
         //field = fillField(balls, balls.length, size, radius).toArray();
         field = smooth(
           fillField(balls, balls.length, size, radius),
           size
         ).toArray();
       }
+
+      // Send the field to GPU, issue draw
       imm.begin(gl.TRIANGLES, program);
-
-      /*field[0] = 0.0;
-      field[1] = 1.0;
-      field[2] = 0.0;
-      //field[4] = 0.0;
-      field[size + 0] = 0.0;
-      field[size + 1] = 0.0;
-      field[size + 2] = 1.0;
-      field[size * size + 0] = 1.0;
-      field[size * size + 1] = 0.0;
-      field[size * size + 2] = 0.0;
-      field[(size - 1) * size * size + 0] = 0.0;
-      field[(size - 1) * size * size + 1] = 1.0;
-      field[(size - 1) * size * size + 2] = 0.0;
-      
-      field[(size - 1) * size * size + (size-1) * size + 0] = 0.0;
-      field[(size - 1) * size * size + (size-1) * size + 1] = 0.0;
-      field[(size - 1) * size * size + (size-1) * size + 2] = 1.0;
-
-      
-      field[(size - 1) * size * size + (size-1) * size + (size-3)] = 1.0;
-      field[(size - 1) * size * size + (size-1) * size + (size-2)] = 0.0;
-      field[(size - 1) * size * size + (size-1) * size + (size-1)] = 0.0;*/
-
-      /*for (let i = 0; i < size; ++i) {
-        for (let j = 0; j < size; ++j) {
-          field[i * size + j] = (1 + Math.sin(5*(i/size + j/size))) / 2;
-        }
-      }*/
 
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.texImage2D(
@@ -1671,27 +1615,11 @@
       gl.activeTexture(gl.TEXTURE0);
 
       imm.quad2d(-1, -1, 2, 2, 1);
-
-      /*// Triangulate. Yeah, this is slow.
-      var size2 = size / 2.0
-      for (var z = 2; z < size - 2; z++) {
-        var z_offset = size * size * z;
-        var fz = (z - size2) / size2 //+ 1
-        for (var y = 2; y < size - 2; y++) {
-          var y_offset = z_offset + size * y;
-          var fy = (y - size2) / size2 //+ 1
-          for (var x = 2; x < size - 2; x++) {
-            var fx = (x - size2) / size2 //+ 1
-            var q = y_offset + x
-            polygonize(fx, fy, fz, q, isol)
-          }
-        }
-      }*/
       imm.end();
     };
   }
 
-  window.MarchingCubesEffect = MarchingCubesEffect;
+  window.RayMarchingEffect = RayMarchingEffect;
 
 }());
 //# sourceMappingURL=bundle.js.map
