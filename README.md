@@ -2,6 +2,15 @@
 
 A web-based, 3D, real-time fluid simulation.
 
+Final Project for CS 419, Production Computer Graphics, at UIUC.
+
+Authors:
+
+- Idan Raiter
+- Curie Hong
+- Rishi Pandey
+- Aryn Harmon
+
 ## Outline of Simulation
 
 For every simulation loop:
