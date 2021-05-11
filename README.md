@@ -19,4 +19,4 @@ For every simulation loop:
 
 ## Installation
 
-To install this project, clone the repository and run `yarn` in the root directory. Then you can run `yarn start` to start the local development server.
+To install this project, clone the repository and run `yarn` in the root directory. Then you can run `yarn dev` to start the local development server.
