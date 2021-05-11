@@ -2,6 +2,8 @@ import { MACGrid } from "./mac-grid.js";
 import { Particles } from "./particles.js";
 import { compileKernels } from "./kernels/kernels.js";
 
+export const FLUID_DENSITY = 997;
+
 export class Simulation {
   constructor(gpu, config) {
     this.particles = new Particles(
@@ -19,25 +21,19 @@ export class Simulation {
     let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
     console.log("SIM START");
     // transfer particle velocities to the grid and interpolate
-    //console.log("1: " + this.grid.velocityX[0][0][0])
     console.log(this.particles.particleBuffer);
     this.grid.velocityX = this.kernels.particleToXGrid(
       particleBufferCopy,
       this.grid.cellSize
     );
-    //console.log("2: " + this.grid.velocityX[0][0][0])
-    //console.log(this.particles.particleBuffer)
     this.grid.velocityY = this.kernels.particleToYGrid(
       particleBufferCopy,
       this.grid.cellSize
     );
-    //console.log("3: " + this.grid.velocityX[0][0][0])
     this.grid.velocityZ = this.kernels.particleToZGrid(
       particleBufferCopy,
       this.grid.cellSize
     );
-
-    //console.log("4: " + this.grid.velocityX[0][0][1])
 
     // copy grid values to store the old ones
     this.grid.pressureOld = this.kernels.copyPressure(this.grid.pressure);
@@ -69,7 +65,6 @@ export class Simulation {
     // this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
     // update the velocities of the particles
-    console.log("PRE " + this.particles.particleBuffer);
     this.particles.particleBuffer = this.kernels
       .gridToParticles(
         this.grid.velocityXOld,
@@ -81,7 +76,6 @@ export class Simulation {
         particleBufferCopy
       )
       .toArray();
-    console.log("POST " + this.particles.particleBuffer);
     // advect the particles to find their new positions
     this.particles.particleBuffer = this.kernels
       .advectParticles(

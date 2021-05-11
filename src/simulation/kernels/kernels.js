@@ -8,7 +8,7 @@ import {
   createEnforceBoundaryZKernel,
 } from "./enforce-boundary-conditions.js";
 import { createParticleToGridKernel } from "./transfer-particle-to-grid.js";
-import { createGridToParticlesKernel } from "../transfer-grid-to-particles.js";
+import { createGridToParticlesKernel } from "./transfer-grid-to-particles.js";
 import {
   createApplyAKernel,
   createComponentWiseAddKernel,
@@ -20,8 +20,8 @@ import {
   createAXKernel,
   createAYKernel,
   createAZKernel,
-} from "./kernels/pressure-solve/build-coefficient-matrix.js.js";
-import { createNegativeDivergenceKernel } from "./kernels/pressure-solve/negative-divergence.js.js";
+} from "./pressure-solve/build-coefficient-matrix.js";
+import { createNegativeDivergenceKernel } from "./pressure-solve/negative-divergence.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();

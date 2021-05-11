@@ -1,13 +1,3 @@
-let adasd = 0;
-let oldlog = console.log;
-console.log = function (text) {
-  if (adasd >= 2) {
-    return;
-  }
-  oldlog(text);
-  ++adasd;
-};
-
 /*
  * Copyright 2010, Google Inc.
  * All rights reserved.
@@ -501,8 +491,7 @@ function MarchingCubesEffect(resolution) {
       deltaTime = 1 / 20;
     }
 
-    //console.log(sim.particles.get(0));
-    //console.log(sim.grid.velocityX[0][0][0]);
+    // step the simulation forwards
     sim.step(deltaTime);
 
     var uniformsConst = {
