@@ -1,6 +1,6 @@
-import { MACGrid } from "../mac-grid.js";
-import { Particles } from "../particles.js";
-import { compileKernels } from "./kernels.js";
+import { MACGrid } from "./mac-grid.js";
+import { Particles } from "./particles.js";
+import { compileKernels } from "./kernels/kernels.js";
 
 export class Simulation {
   constructor(gpu, config) {
@@ -10,18 +10,17 @@ export class Simulation {
     );
     this.grid = new MACGrid(
       config.gridBounds,
-      //2.0 / Math.cbrt(config.particleDensity)
-      0.05
+      2.0 / Math.cbrt(config.particleDensity)
     );
     this.kernels = compileKernels(gpu, this.particles, this.grid);
   }
 
   step(dt) {
     let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
-    console.log("SIM START")
+    console.log("SIM START");
     // transfer particle velocities to the grid and interpolate
     //console.log("1: " + this.grid.velocityX[0][0][0])
-    console.log(this.particles.particleBuffer)
+    console.log(this.particles.particleBuffer);
     this.grid.velocityX = this.kernels.particleToXGrid(
       particleBufferCopy,
       this.grid.cellSize
@@ -69,26 +68,29 @@ export class Simulation {
     // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
     // this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
-
     // update the velocities of the particles
-    console.log("PRE " + this.particles.particleBuffer)
-    this.particles.particleBuffer = this.kernels.gridToParticles(
-      this.grid.velocityXOld,
-      this.grid.velocityYOld,
-      this.grid.velocityZOld,
-      this.grid.velocityX,
-      this.grid.velocityY,
-      this.grid.velocityZ,
-      particleBufferCopy
-    ).toArray();
-    console.log("POST " + this.particles.particleBuffer)
+    console.log("PRE " + this.particles.particleBuffer);
+    this.particles.particleBuffer = this.kernels
+      .gridToParticles(
+        this.grid.velocityXOld,
+        this.grid.velocityYOld,
+        this.grid.velocityZOld,
+        this.grid.velocityX,
+        this.grid.velocityY,
+        this.grid.velocityZ,
+        particleBufferCopy
+      )
+      .toArray();
+    console.log("POST " + this.particles.particleBuffer);
     // advect the particles to find their new positions
-    this.particles.particleBuffer = this.kernels.advectParticles(
-      new Float32Array(this.particles.particleBuffer),
-      dt,
-      this.grid.velocityX,
-      this.grid.velocityY,
-      this.grid.velocityZ
-    ).toArray();
+    this.particles.particleBuffer = this.kernels
+      .advectParticles(
+        new Float32Array(this.particles.particleBuffer),
+        dt,
+        this.grid.velocityX,
+        this.grid.velocityY,
+        this.grid.velocityZ
+      )
+      .toArray();
   }
 }

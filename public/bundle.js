@@ -251,11 +251,11 @@
       this.nz = this.count[2] - 1;
       this.pressure = initialize3DArray(this.nx, this.ny, this.nz);
       this.pressureOld = null;
-      this.velocityX = [[["hi"]]];//initialize3DArray(this.nx + 1, this.ny, this.nz);
+      this.velocityX = [[["hi"]]]; //initialize3DArray(this.nx + 1, this.ny, this.nz);
       this.velocityXOld = null;
-      this.velocityY = null;//initialize3DArray(this.nx, this.ny + 1, this.nz);
+      this.velocityY = null; //initialize3DArray(this.nx, this.ny + 1, this.nz);
       this.velocityYOld = null;
-      this.velocityZ = null;//initialize3DArray(this.nx, this.ny, this.nz + 1);
+      this.velocityZ = null; //initialize3DArray(this.nx, this.ny, this.nz + 1);
       this.velocityZOld = null;
 
       // initialize voxel states
@@ -363,7 +363,7 @@
     gpu
       .createKernel(function (velocity_y, dt) {
         return (
-          velocity_y[this.thread.z][this.thread.y][this.thread.x] - dt * 1
+          velocity_y[this.thread.z][this.thread.y][this.thread.x] - dt * 9.81
         );
       })
       .setOutput([nx, ny, nz]);
@@ -760,7 +760,9 @@
       ny,
       nz + 1
     ).setPipeline(true);
-    const flipKernel = createFLIPKernel(gpu, particleCount, cellSize).setPipeline(true);
+    const flipKernel = createFLIPKernel(gpu, particleCount, cellSize).setPipeline(
+      true
+    );
     /*return gpu.combineKernels(
       velocityXDifference,
       velocityYDifference,
@@ -897,8 +899,7 @@
       );
       this.grid = new MACGrid(
         config.gridBounds,
-        //2.0 / Math.cbrt(config.particleDensity)
-        0.05
+        2.0 / Math.cbrt(config.particleDensity)
       );
       this.kernels = compileKernels(gpu, this.particles, this.grid);
     }
@@ -956,33 +957,36 @@
       // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
       // this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
-
       // update the velocities of the particles
       console.log("PRE " + this.particles.particleBuffer);
-      this.particles.particleBuffer = this.kernels.gridToParticles(
-        this.grid.velocityXOld,
-        this.grid.velocityYOld,
-        this.grid.velocityZOld,
-        this.grid.velocityX,
-        this.grid.velocityY,
-        this.grid.velocityZ,
-        particleBufferCopy
-      ).toArray();
+      this.particles.particleBuffer = this.kernels
+        .gridToParticles(
+          this.grid.velocityXOld,
+          this.grid.velocityYOld,
+          this.grid.velocityZOld,
+          this.grid.velocityX,
+          this.grid.velocityY,
+          this.grid.velocityZ,
+          particleBufferCopy
+        )
+        .toArray();
       console.log("POST " + this.particles.particleBuffer);
       // advect the particles to find their new positions
-      this.particles.particleBuffer = this.kernels.advectParticles(
-        new Float32Array(this.particles.particleBuffer),
-        dt,
-        this.grid.velocityX,
-        this.grid.velocityY,
-        this.grid.velocityZ
-      ).toArray();
+      this.particles.particleBuffer = this.kernels
+        .advectParticles(
+          new Float32Array(this.particles.particleBuffer),
+          dt,
+          this.grid.velocityX,
+          this.grid.velocityY,
+          this.grid.velocityZ
+        )
+        .toArray();
     }
   }
 
   let adasd = 0;
   let oldlog = console.log;
-  console.log = function(text) {
+  console.log = function (text) {
     if (adasd >= 2) {
       return;
     }
@@ -998,10 +1002,8 @@
     }
 
     var arrays = tdl.primitives.createCube(1.0);
-    var program = tdl.programs.loadProgramFromScriptTags(
-        "ray_vs", "ray_fs");
+    var program = tdl.programs.loadProgramFromScriptTags("ray_vs", "ray_fs");
     var textures = [new tdl.textures.ExternalTexture2D()];
-    
 
     var view = new Float32Array(16);
 
@@ -1025,7 +1027,6 @@
 
     var m4 = tdl.fast.matrix4;
 
-    
     var tex = textures[0].texture;
     var tex_level = 0;
     var tex_width = max_tex_dim;
@@ -1041,7 +1042,7 @@
 
     const gpu = new GPU();
     const sim = new Simulation(gpu, {
-      particleDensity: 2000,
+      particleDensity: 10000,
       particleBounds: {
         min: fromValues(0.3, 0.3, 0.3),
         max: fromValues(0.7, 0.7, 0.7),
@@ -1052,7 +1053,8 @@
       },
     });
 
-    const fillField = gpu.createKernel(function(balls, n, size, radius) {
+    const fillField = gpu
+      .createKernel(function (balls, n, size, radius) {
         let z = Math.floor(this.thread.x / (size * size));
         let y = Math.floor(this.thread.x / size) % size;
         let x = this.thread.x % size;
@@ -1063,53 +1065,76 @@
         let best = 100000;
         // if n too big will need to change loopmaxiterations
         for (let i = 0; i < n; ++i) {
-          let cur = (x_w - balls[i][0]) * (x_w - balls[i][0]) + (y_w - balls[i][1]) * (y_w - balls[i][1]) + (z_w - balls[i][2]) * (z_w - balls[i][2]);
+          let cur =
+            (x_w - balls[i][0]) * (x_w - balls[i][0]) +
+            (y_w - balls[i][1]) * (y_w - balls[i][1]) +
+            (z_w - balls[i][2]) * (z_w - balls[i][2]);
           if (cur < best) {
             best = cur;
             closest = i;
           }
         }
-        
+
         //field[y_offset + x] = sphereSDF(x_w - balls[closest][0], y_w - balls[closest][1], z_w - balls[closest][2], radius);
-        return Math.sqrt((x_w - balls[closest][0]) * (x_w - balls[closest][0]) + 
-               (y_w - balls[closest][1]) * (y_w - balls[closest][1]) + 
-               (z_w - balls[closest][2]) * (z_w - balls[closest][2])) - radius;
-    }).setLoopMaxIterations(10000).setPipeline(true).setOutput([max_tex_dim * 4]);
+        return (
+          Math.sqrt(
+            (x_w - balls[closest][0]) * (x_w - balls[closest][0]) +
+              (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
+              (z_w - balls[closest][2]) * (z_w - balls[closest][2])
+          ) - radius
+        );
+      })
+      .setLoopMaxIterations(10000)
+      .setPipeline(true)
+      .setOutput([max_tex_dim * 4]);
 
-    gpu.createKernel(function(field, size) {
-      let z_c = Math.floor(this.thread.x / (size * size));
-      let y_c = Math.floor(this.thread.x / size) % size;
-      let x_c = this.thread.x % size;
+    const smooth = gpu
+      .createKernel(function (field, size) {
+        let z_c = Math.floor(this.thread.x / (size * size));
+        let y_c = Math.floor(this.thread.x / size) % size;
+        let x_c = this.thread.x % size;
 
-      let sum = 0;
-      let count = 0.001; // weight must be nonzero
-      let r = 2;
-      for (let z_o = -r; z_o <= r; ++z_o) {
-        for (let y_o = -r; y_o <= r; ++y_o) {
-          for (let x_o = -r; x_o <= r; ++x_o) {
-            let x = x_c + x_o;
-            let y = y_c + y_o;
-            let z = z_c + z_o;
-            
-            let w = Math.pow(2.71, -1.5 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o));
+        let sum = 0;
+        let count = 0.001; // weight must be nonzero
+        let r = 2;
+        for (let z_o = -r; z_o <= r; ++z_o) {
+          for (let y_o = -r; y_o <= r; ++y_o) {
+            for (let x_o = -r; x_o <= r; ++x_o) {
+              let x = x_c + x_o;
+              let y = y_c + y_o;
+              let z = z_c + z_o;
 
-            if (x < 0 || x > size-1 || y < 0 || y > size-1 || z < 0 || z > size-1) {
-              // cheaper than continue, will try to read invalid data
-              w = 0.0;
+              let w = Math.pow(
+                2.71,
+                -1.5 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o)
+              );
+
+              if (
+                x < 0 ||
+                x > size - 1 ||
+                y < 0 ||
+                y > size - 1 ||
+                z < 0 ||
+                z > size - 1
+              ) {
+                // cheaper than continue, will try to read invalid data
+                w = 0.0;
+              }
+
+              //let w = x_o == 0 && y_o == 0 && z_o == 0 ? 1.0 : 0.0;
+
+              sum += field[z * size * size + y * size + x] * w;
+              count += w;
             }
-            
-            //let w = x_o == 0 && y_o == 0 && z_o == 0 ? 1.0 : 0.0;
-            
-            sum += field[z * size * size + y * size + x] * w;
-            count += w;
           }
         }
-      }
 
-      return sum / count;
-    }).setPipeline(true).setOutput([max_tex_dim * 4]);
+        return sum / count;
+      })
+      .setPipeline(true)
+      .setOutput([max_tex_dim * 4]);
 
-    this.render = function(framebuffer, time, numblobs) {
+    this.render = function (framebuffer, time, numblobs) {
       /*m4.perspective(proj, tdl.math.degToRad(60), aspect, 0.1, 500);
       m4.rotationY(world, 0);//time * 0.5)
       m4.translate(world, [0, 0, 0])
@@ -1117,7 +1142,7 @@
       m4.mul(worldview, world, view)
       m4.mul(worldviewproj, world, viewproj)*/
 
-      gl.clearColor(0.0,0.0,0.0,1);
+      gl.clearColor(0.0, 0.0, 0.0, 1);
       gl.clearDepth(1.0);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.DEPTH_TEST);
@@ -1129,14 +1154,13 @@
 
       let localTime = Date.now() / 1000 - startTime;
 
-      if (deltaTime > 1/20) {
-        deltaTime = 1/20;
+      if (deltaTime > 1 / 20) {
+        deltaTime = 1 / 20;
       }
 
       //console.log(sim.particles.get(0));
       //console.log(sim.grid.velocityX[0][0][0]);
       sim.step(deltaTime);
-      
 
       var uniformsConst = {
         //u_worldviewproj: worldviewproj,
@@ -1147,7 +1171,7 @@
         //u_ambientUp: [35 / 255.0 * 0.5, 137 / 255.0 * 0.5, 218 / 255.0 * 0.5, 1.0],
         //u_ambientDown: [15 / 255.0 * 0.5, 94 / 255.0 * 0.5, 156 / 255.0 * 0.5, 1.0],
         u_field: textures[0],
-        time: localTime
+        time: localTime,
       };
 
       model.drawPrep(uniformsConst);
@@ -1158,7 +1182,7 @@
         //for (var i = 0; i < size * size * size; i++) {
         // field[i] = 100000.0
         //}
-       /*
+        /*
         let balls = [];
         let n = 30;
         let radius = 0.04;
@@ -1173,14 +1197,21 @@
             balls.push([xp, y, zp]);
           }
         }*/
-        
+
         let balls = [];
-        let radius = 0.05;
+        let radius = 0.04;
         for (let i = 0; i < sim.particles.particleBuffer.length; i += 6) {
-          balls.push([sim.particles.particleBuffer[i], sim.particles.particleBuffer[i+1], sim.particles.particleBuffer[i+2]]);
+          balls.push([
+            sim.particles.particleBuffer[i],
+            sim.particles.particleBuffer[i + 1],
+            sim.particles.particleBuffer[i + 2],
+          ]);
         }
-        field = fillField(balls, balls.length, size, radius).toArray();
-        //field = smooth(fillField(balls, balls.length, size, radius), size).toArray();
+        //field = fillField(balls, balls.length, size, radius).toArray();
+        field = smooth(
+          fillField(balls, balls.length, size, radius),
+          size
+        ).toArray();
       }
       imm.begin(gl.TRIANGLES, program);
 
@@ -1212,9 +1243,19 @@
           field[i * size + j] = (1 + Math.sin(5*(i/size + j/size))) / 2;
         }
       }*/
-      
+
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(gl.TEXTURE_2D, tex_level, gl.RGBA, tex_width, tex_height, 0, gl.RGBA, gl.FLOAT, field);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        tex_level,
+        gl.RGBA,
+        tex_width,
+        tex_height,
+        0,
+        gl.RGBA,
+        gl.FLOAT,
+        field
+      );
 
       gl.activeTexture(gl.TEXTURE0);
 

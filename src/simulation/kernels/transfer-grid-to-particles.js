@@ -99,7 +99,9 @@ export const createGridToParticlesKernel = (
     ny,
     nz + 1
   ).setPipeline(true);
-  const flipKernel = createFLIPKernel(gpu, particleCount, cellSize).setPipeline(true);
+  const flipKernel = createFLIPKernel(gpu, particleCount, cellSize).setPipeline(
+    true
+  );
   /*return gpu.combineKernels(
     velocityXDifference,
     velocityYDifference,
