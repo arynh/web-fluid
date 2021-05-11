@@ -14,6 +14,7 @@ export class Simulation {
       config.gridBounds,
       2.0 / Math.cbrt(config.particleDensity)
     );
+    this.grid.addDefaultSolids();
     this.kernels = compileKernels(gpu, this.particles, this.grid);
   }
 

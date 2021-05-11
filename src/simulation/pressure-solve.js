@@ -15,7 +15,9 @@ const solve = (
   const Az = kernels.buildAZ(voxelStates, dt);
   // build negative divergence vector
   // TODO: d needs to be flattened
-  const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
+  const d = kernels.flatten(
+    kernels.buildD(voxelStates, velocityX, velocityY, velocityZ)
+  );
 
   // follow PCG algorithm set out in Bridson
   let p = kernels.zeroVector();

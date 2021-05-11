@@ -368,7 +368,14 @@
       })
       .setOutput([nx, ny, nz]);
 
-  const createAdvectParticlesKernel = (gpu, particleCount, cellSize) =>
+  const createAdvectParticlesKernel = (
+    gpu,
+    particleCount,
+    cellSize,
+    nx,
+    ny,
+    nz
+  ) =>
     gpu
       .createKernel(function (
         particles,
@@ -406,7 +413,17 @@
             lerpWeight
           );
           let k2 = dt * vxIntermediate;
-          return x + k2;
+          let projectedPosition = x + k2;
+          if (projectedPosition < this.constants.CELL_SIZE) {
+            projectedPosition = this.constants.CELL_SIZE;
+          } else if (
+            projectedPosition >
+            (this.constants.NX - 1) * this.constants.CELL_SIZE
+          ) {
+            projectedPosition =
+              (this.constants.NX - 1) * this.constants.CELL_SIZE;
+          }
+          return projectedPosition;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
           // get position
           let x = particles[this.thread.x - 1];
@@ -435,7 +452,17 @@
             lerpWeight
           );
           let k2 = dt * vyIntermediate;
-          return y + k2;
+          let projectedPosition = y + k2;
+          if (projectedPosition < this.constants.CELL_SIZE) {
+            projectedPosition = this.constants.CELL_SIZE;
+          } else if (
+            projectedPosition >
+            (this.constants.NY - 1) * this.constants.CELL_SIZE
+          ) {
+            projectedPosition =
+              (this.constants.NY - 1) * this.constants.CELL_SIZE;
+          }
+          return projectedPosition;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
           // get position
           let x = particles[this.thread.x - 2];
@@ -464,7 +491,17 @@
             lerpWeight
           );
           let k2 = dt * vzIntermediate;
-          return z + k2;
+          let projectedPosition = z + k2;
+          if (projectedPosition < this.constants.CELL_SIZE) {
+            projectedPosition = this.constants.CELL_SIZE;
+          } else if (
+            projectedPosition >
+            (this.constants.NZ - 1) * this.constants.CELL_SIZE
+          ) {
+            projectedPosition =
+              (this.constants.NZ - 1) * this.constants.CELL_SIZE;
+          }
+          return projectedPosition;
         } else {
           // don't change the velocities
           return particles[this.thread.x];
@@ -473,7 +510,13 @@
       .addFunction(function lerp(a, b, t) {
         return (1 - t) * a + t * b;
       })
-      .setConstants({ ATTRIBUTE_COUNT: ATTRIBUTE_COUNT, CELL_SIZE: cellSize })
+      .setConstants({
+        ATTRIBUTE_COUNT: ATTRIBUTE_COUNT,
+        CELL_SIZE: cellSize,
+        NX: nx,
+        NY: ny,
+        NZ: nz,
+      })
       .setOutput([ATTRIBUTE_COUNT * particleCount]);
 
   const createClassifyVoxelsKernel = (gpu, particleCount, nx, ny, nz) =>
@@ -819,15 +862,22 @@
 
   /**
    * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
-   * FIXME: I'm not quite sure how to do this, this is just a guess.
    */
   const createApplyAKernel = (gpu, vectorLength) =>
     gpu
       .createKernel(function (Adiag, Ax, Ay, Az, x) {
-        this.thread.x;
-        // FIXME: idk how to do this
+        const aux = this.thread.x % (this.constants.NX * this.constants.NY);
+        Math.floor(aux / this.constants.NY);
+        aux % this.constants.NX;
+        Math.floor(
+          this.thread.x / (this.constants.NX * this.constants.NY)
+        );
+
+        if (this.thread.x === 0) ; else if (this.thread.x === 1) ; else if (this.thread.x === 2) ; else if (this.thread.x === 3) ; else if (this.thread.x === 4) ; else if (this.thread.x === 5) ;
       })
+      .addFunction(function () {})
       .setTactic("precision") // vector math should be high precision
+      .setConstants({ VECTOR_LENGTH: vectorLength })
       .setOutput([vectorLength]);
 
   /**
@@ -1075,6 +1125,27 @@
       })
       .setOutput([nx, ny, nz]);
 
+  /**
+   * Map from 3D arrays to 1D vectors.
+   *
+   * To unflatten:
+   * `(k * ny + i) * nx + j`
+   */
+  const createFlattenKernel = (gpu, nx, ny, nz) =>
+    gpu
+      .createKernel(function (array) {
+        const aux = this.thread.x % (this.constants.NX * this.constants.NY);
+        const i = Math.floor(aux / this.constants.NY);
+        const j = aux % this.constants.NX;
+        const k = Math.floor(
+          this.thread.x / (this.constants.NX * this.constants.NY)
+        );
+        return array[k][j][i];
+      })
+      .setTactic("precision")
+      .setConstants({ NX: nx, NY: ny, NZ: nz })
+      .setOutput([nx * ny * nz]);
+
   const compileKernels = (gpu, particles, grid) => {
     const start = Date.now();
 
@@ -1139,6 +1210,7 @@
       ...gridSize,
       grid.cellSize
     );
+    const flatten = createFlattenKernel(gpu, ...gridSize);
 
     // compile kernels to do vector operations
     const pcgVectorLength = grid.nx * grid.ny * grid.nz;
@@ -1172,6 +1244,7 @@
       buildAY: buildAY.setPipeline(true),
       buildAZ: buildAZ.setPipeline(true),
       buildD: buildD.setPipeline(true),
+      flatten: flatten.setPipeline(true),
       math: math,
       zeroVector: zeroVector.setPipeline(true),
     };
@@ -1188,7 +1261,8 @@
     const advectParticles = createAdvectParticlesKernel(
       gpu,
       particles.count(),
-      grid.cellSize
+      grid.cellSize,
+      ...gridSize
     );
 
     const end = Date.now();
@@ -1225,6 +1299,7 @@
         config.gridBounds,
         2.0 / Math.cbrt(config.particleDensity)
       );
+      this.grid.addDefaultSolids();
       this.kernels = compileKernels(gpu, this.particles, this.grid);
     }
 

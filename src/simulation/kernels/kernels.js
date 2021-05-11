@@ -22,6 +22,7 @@ import {
   createAZKernel,
 } from "./pressure-solve/build-coefficient-matrix.js";
 import { createNegativeDivergenceKernel } from "./pressure-solve/negative-divergence.js";
+import { createFlattenKernel } from "./pressure-solve/flatten.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
@@ -87,6 +88,7 @@ export const compileKernels = (gpu, particles, grid) => {
     ...gridSize,
     grid.cellSize
   );
+  const flatten = createFlattenKernel(gpu, ...gridSize);
 
   // compile kernels to do vector operations
   const pcgVectorLength = grid.nx * grid.ny * grid.nz;
@@ -120,6 +122,7 @@ export const compileKernels = (gpu, particles, grid) => {
     buildAY: buildAY.setPipeline(true),
     buildAZ: buildAZ.setPipeline(true),
     buildD: buildD.setPipeline(true),
+    flatten: flatten.setPipeline(true),
     math: math,
     zeroVector: zeroVector.setPipeline(true),
   };
@@ -136,7 +139,8 @@ export const compileKernels = (gpu, particles, grid) => {
   const advectParticles = createAdvectParticlesKernel(
     gpu,
     particles.count(),
-    grid.cellSize
+    grid.cellSize,
+    ...gridSize
   );
 
   const end = Date.now();

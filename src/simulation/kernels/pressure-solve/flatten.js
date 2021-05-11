@@ -1,8 +1,10 @@
 /**
  * Map from 3D arrays to 1D vectors.
+ *
+ * To unflatten:
+ * `(k * ny + i) * nx + j`
  */
-
-const createFlattenKernel = (gpu, nx, ny, nz) =>
+export const createFlattenKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (array) {
       const aux = this.thread.x % (this.constants.NX * this.constants.NY);
@@ -11,14 +13,8 @@ const createFlattenKernel = (gpu, nx, ny, nz) =>
       const k = Math.floor(
         this.thread.x / (this.constants.NX * this.constants.NY)
       );
-      return array[i][j][k];
+      return array[k][j][i];
     })
     .setTactic("precision")
     .setConstants({ NX: nx, NY: ny, NZ: nz })
     .setOutput([nx * ny * nz]);
-
-const createUnflattenKernel = (gpu, nx, ny, nz) =>
-  gpu
-    .createKernel(function (vector) {})
-    .setTactic("precision")
-    .setOutput([nx, ny, nz]);
