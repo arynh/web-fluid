@@ -20,9 +20,7 @@ export class Simulation {
 
   step(dt) {
     let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
-    console.log("SIM START");
     // transfer particle velocities to the grid and interpolate
-    console.log(this.particles.particleBuffer);
     this.grid.velocityX = this.kernels.particleToXGrid(
       particleBufferCopy,
       this.grid.cellSize
