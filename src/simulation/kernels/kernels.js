@@ -101,7 +101,7 @@ export const compileKernels = (gpu, particles, grid) => {
   const dot = (a, b) =>
     componentWiseMultiply(a, b).reduce((sum, n) => sum + n, 0);
   const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
-  const applyA = createApplyAKernel(gpu, pcgVectorLength);
+  const applyA = createApplyAKernel(gpu, pcgVectorLength, ...gridSize);
   const math = {
     componentWiseAdd: componentWiseAdd.setPipeline(true),
     dot: dot,

@@ -1,7 +1,9 @@
+import { STATE_ENUM } from "../../mac-grid.js";
+
 /**
  * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
  */
-export const createApplyAKernel = (gpu, vectorLength) =>
+export const createApplyAKernel = (gpu, vectorLength, nx, ny, nz) =>
   gpu
     .createKernel(function (Adiag, Ax, Ay, Az, x, voxelStates) {
       const aux = this.thread.x % (this.constants.NX * this.constants.NY);

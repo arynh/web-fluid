@@ -861,26 +861,6 @@
       .setOutput([vectorLength]);
 
   /**
-   * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
-   */
-  const createApplyAKernel = (gpu, vectorLength) =>
-    gpu
-      .createKernel(function (Adiag, Ax, Ay, Az, x) {
-        const aux = this.thread.x % (this.constants.NX * this.constants.NY);
-        Math.floor(aux / this.constants.NY);
-        aux % this.constants.NX;
-        Math.floor(
-          this.thread.x / (this.constants.NX * this.constants.NY)
-        );
-
-        if (this.thread.x === 0) ; else if (this.thread.x === 1) ; else if (this.thread.x === 2) ; else if (this.thread.x === 3) ; else if (this.thread.x === 4) ; else if (this.thread.x === 5) ;
-      })
-      .addFunction(function () {})
-      .setTactic("precision") // vector math should be high precision
-      .setConstants({ VECTOR_LENGTH: vectorLength })
-      .setOutput([vectorLength]);
-
-  /**
    * Assumption!
    * As long as there is the default solid walls around the fluid, edge cases
    * will be fine. Otherwise, this will need to be modified to support more
@@ -898,7 +878,7 @@
         const AIR = this.constants.AIR;
 
         // only consider fluid cells
-        if (voxelStates[i][j][k] !== FLUID) {
+        if (voxelStates[k][j][i] !== FLUID) {
           return 0;
         }
 
@@ -911,37 +891,37 @@
         let accumulator = 0;
 
         // negative x neighbor
-        if (voxelStates[i - 1][j][k] === FLUID) {
+        if (voxelStates[k][j][i - 1] === FLUID) {
           accumulator += scale;
         }
         // positive x neighbor
         if (
-          voxelStates[i + 1][j][k] === FLUID ||
-          voxelStates[i + 1][j][k] === AIR
+          voxelStates[k][j][i + 1] === FLUID ||
+          voxelStates[k][j][i + 1] === AIR
         ) {
           accumulator += scale;
         }
 
         // negative y neighbor
-        if (voxelStates[i][j - 1][k] === FLUID) {
+        if (voxelStates[k][j - 1][i] === FLUID) {
           accumulator += scale;
         }
         // positive y neighbor
         if (
-          voxelStates[i][j + 1][k] === FLUID ||
-          voxelStates[i][j + 1][k] === AIR
+          voxelStates[k][j + 1][i] === FLUID ||
+          voxelStates[k][j + 1][i] === AIR
         ) {
           accumulator += scale;
         }
 
         // negative z neighbor
-        if (voxelStates[i][j][k - 1] === FLUID) {
+        if (voxelStates[k - 1][j][i] === FLUID) {
           accumulator += scale;
         }
         // positive z neighbor
         if (
-          voxelStates[i][j][k + 1] === FLUID ||
-          voxelStates[i][j][k + 1] === AIR
+          voxelStates[k + 1][j][i] === FLUID ||
+          voxelStates[k + 1][j][i] === AIR
         ) {
           accumulator += scale;
         }
@@ -968,7 +948,7 @@
         const FLUID = this.constants.FLUID;
 
         // only consider fluid cells
-        if (voxelStates[i][j][k] !== FLUID) {
+        if (voxelStates[k][j][i] !== FLUID) {
           return 0;
         }
 
@@ -980,7 +960,7 @@
 
         let accumulator = 0;
         //positive x neighbor
-        if (voxelStates[(k)] === FLUID) {
+        if (voxelStates[k][j][i + 1] === FLUID) {
           accumulator = -scale;
         }
         return accumulator;
@@ -1005,7 +985,7 @@
         const FLUID = this.constants.FLUID;
 
         // only consider fluid cells
-        if (voxelStates[i][j][k] !== FLUID) {
+        if (voxelStates[k][j][i] !== FLUID) {
           return 0;
         }
 
@@ -1017,7 +997,7 @@
 
         let accumulator = 0;
         //positive y neighbor
-        if (voxelStates[(k)] === FLUID) {
+        if (voxelStates[k][j + 1][i] === FLUID) {
           accumulator = -scale;
         }
         return accumulator;
@@ -1042,7 +1022,7 @@
         const FLUID = this.constants.FLUID;
 
         // only consider fluid cells
-        if (voxelStates[i][j][k] !== FLUID) {
+        if (voxelStates[k][j][i] !== FLUID) {
           return 0;
         }
 
@@ -1054,7 +1034,7 @@
 
         let accumulator = 0;
         //positive z neighbor
-        if (voxelStates[(k + 1)] === FLUID) {
+        if (voxelStates[k + 1][j][i] === FLUID) {
           accumulator = -scale;
         }
         return accumulator;
@@ -1077,7 +1057,7 @@
         const j = this.thread.y;
         const k = this.thread.z;
 
-        if (voxelStates[i][j][k] !== FLUID) {
+        if (voxelStates[k][j][i] !== FLUID) {
           return 0;
         }
 
@@ -1085,34 +1065,34 @@
 
         let divergence =
           -scale *
-          (velocityX[i + 1][j][k] -
-            velocityX[i][j][k] +
-            velocityY[i][j + 1][k] -
-            velocityY[i][j][k] +
-            velocityZ[i][j][k + 1] -
-            velocityZ[i][j][k]);
+          (velocityX[k][j][i + 1] -
+            velocityX[k][j][i] +
+            velocityY[k][j + 1][i] -
+            velocityY[k][j][i] +
+            velocityZ[k + 1][j][i] -
+            velocityZ[k][j][i]);
 
         // modifying RHS (divergence) to account for solid velocities
-        if (voxelStates[i - 1][j][k] === SOLID) {
-          divergence -= scale * velocityX[i][j][k];
+        if (voxelStates[k][j][i - 1] === SOLID) {
+          divergence -= scale * velocityX[k][j][i];
         }
-        if (voxelStates[i + 1][j][k] === SOLID) {
-          divergence += scale * velocityX[i + 1][j][k];
-        }
-
-        if (voxelStates[i][j - 1][k] === SOLID) {
-          divergence -= scale * velocityY[i][j][k];
-        }
-        if (voxelStates[i][j + 1][k] === SOLID) {
-          divergence += scale * velocityY[i][j + 1][k];
+        if (voxelStates[k][j][i + 1] === SOLID) {
+          divergence += scale * velocityX[k][j][i + 1];
         }
 
-        if (voxelStates[i][j][k - 1] === SOLID) {
-          divergence -= scale * velocityZ[i][j][k];
+        if (voxelStates[k][j - 1][i] === SOLID) {
+          divergence -= scale * velocityY[k][j][i];
+        }
+        if (voxelStates[k][j + 1][i] === SOLID) {
+          divergence += scale * velocityY[k][j + 1][i];
         }
 
-        if (voxelStates[i][j][k + 1] === SOLID) {
-          divergence += scale * velocityZ[i][j][k + 1];
+        if (voxelStates[k - 1][j][i] === SOLID) {
+          divergence -= scale * velocityZ[k][j][i];
+        }
+
+        if (voxelStates[k + 1][j][i] === SOLID) {
+          divergence += scale * velocityZ[k + 1][j][i];
         }
 
         return divergence;
@@ -1145,6 +1125,73 @@
       .setTactic("precision")
       .setConstants({ NX: nx, NY: ny, NZ: nz })
       .setOutput([nx * ny * nz]);
+
+  /**
+   * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
+   */
+  const createApplyAKernel = (gpu, vectorLength, nx, ny, nz) =>
+    gpu
+      .createKernel(function (Adiag, Ax, Ay, Az, x, voxelStates) {
+        const aux = this.thread.x % (this.constants.NX * this.constants.NY);
+        const i = Math.floor(aux / this.constants.NY);
+        const j = aux % this.constants.NX;
+        const k = Math.floor(
+          this.thread.x / (this.constants.NX * this.constants.NY)
+        );
+
+        // only consider fluid cells
+        if (voxelStates[k][j][i] !== this.constants.FLUID) {
+          return 0;
+        }
+
+        let vectorIndex = this.thread.x;
+        let accumulator = Adiag[k][j][i] * x[vectorIndex];
+
+        // negative x neighbor
+        if (voxelStates[k][j][i - 1] === this.constants.FLUID) {
+          vectorIndex = gridToVectorIndex(i - 1, j, k);
+          accumulator += Ax[k][j][i - 1] * x[vectorIndex];
+        }
+        // positive x neighbor
+        if (voxelStates[k][j][i + 1] === this.constants.FLUID) {
+          vectorIndex = gridToVectorIndex(i + 1, j, k);
+          accumulator += Ax[k][j][i + 1] * x[vectorIndex];
+        }
+        // negative y neighbor
+        if (voxelStates[k][j - 1][i] === this.constants.FLUID) {
+          vectorIndex = gridToVectorIndex(i, j - 1, k);
+          accumulator += Ay[k][j - 1][i] * x[vectorIndex];
+        }
+        // positive y neighbor
+        if (voxelStates[k][j + 1][i] === this.constants.FLUID) {
+          vectorIndex = gridToVectorIndex(i, j + 1, k);
+          accumulator += Ay[k][j + 1][i] * x[vectorIndex];
+        }
+        // negative z neighbor
+        if (voxelStates[k - 1][j][i] === this.constants.FLUID) {
+          vectorIndex = gridToVectorIndex(i, j, k - 1);
+          accumulator += Az[k - 1][j][i] * x[vectorIndex];
+        }
+        // positive z neighbor
+        if (voxelStates[k + 1][j][i] === this.constants.FLUID) {
+          vectorIndex = gridToVectorIndex(i, j, k + 1);
+          accumulator += Az[k + 1][j][i] * x[vectorIndex];
+        }
+
+        return accumulator;
+      })
+      .addFunction(function gridToVectorIndex(i, j, k) {
+        return (k * this.constants.NY + i) * this.constants.NX + j;
+      })
+      .setTactic("precision") // vector math should be high precision
+      .setConstants({
+        VECTOR_LENGTH: vectorLength,
+        NX: nx,
+        NY: ny,
+        NZ: nz,
+        FLUID: STATE_ENUM.FLUID,
+      })
+      .setOutput([vectorLength]);
 
   const compileKernels = (gpu, particles, grid) => {
     const start = Date.now();
@@ -1223,7 +1270,7 @@
     const dot = (a, b) =>
       componentWiseMultiply(a, b).reduce((sum, n) => sum + n, 0);
     const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
-    const applyA = createApplyAKernel(gpu, pcgVectorLength);
+    const applyA = createApplyAKernel(gpu, pcgVectorLength, ...gridSize);
     const math = {
       componentWiseAdd: componentWiseAdd.setPipeline(true),
       dot: dot,
