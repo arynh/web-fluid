@@ -251,11 +251,11 @@
       this.nz = this.count[2] - 1;
       this.pressure = initialize3DArray(this.nx, this.ny, this.nz);
       this.pressureOld = null;
-      this.velocityX = [[["hi"]]]; //initialize3DArray(this.nx + 1, this.ny, this.nz);
+      this.velocityX = null;
       this.velocityXOld = null;
-      this.velocityY = null; //initialize3DArray(this.nx, this.ny + 1, this.nz);
+      this.velocityY = null;
       this.velocityYOld = null;
-      this.velocityZ = null; //initialize3DArray(this.nx, this.ny, this.nz + 1);
+      this.velocityZ = null;
       this.velocityZOld = null;
 
       // initialize voxel states
@@ -359,6 +359,96 @@
     }
   }
 
+  const solve = (
+    kernels,
+    voxelStates,
+    dt,
+    velocityX,
+    velocityY,
+    velocityZ,
+    tolerance,
+    iterationLimit
+  ) => {
+
+    // build coefficient matrix
+    const Adiag = kernels.buildADiag(voxelStates, dt);
+    const Ax = kernels.buildAX(voxelStates, dt);
+    const Ay = kernels.buildAY(voxelStates, dt);
+    const Az = kernels.buildAZ(voxelStates, dt);
+    // build negative divergence vector
+    const d = kernels.flatten(
+      kernels.buildD(voxelStates, velocityX, velocityY, velocityZ)
+    );
+
+    // follow PCG algorithm set out in Bridson
+    let p = kernels.zeroVector();
+    let r = d;
+    let _r = [];
+    let z = r; // applyPreconditioner(r); // TODO: implement the preconditioner.
+    let s = z;
+    let sigma = kernels.math.dot(z, r);
+
+    let iterationCount = 0;
+    while (iterationCount++ < iterationLimit) {
+      // z <- As
+      z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
+
+      // alpha <- sigma / (z dot s)
+      let alpha = sigma / kernels.math.dot(z, s);
+
+      // p <- p + alpha * s
+      p = kernels.math.componentWiseAdd(p, kernels.math.scalarMultiply(s, alpha));
+
+      // r <- r - alpha * z
+      r = kernels.math.componentWiseAdd(
+        r,
+        kernels.math.scalarMultiply(z, -alpha)
+      );
+
+      // transfer r to CPU to do error calculation
+      _r = r.toArray();
+
+      if (iterationCount % 50 === 0) {
+        console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
+      }
+
+      // if the residual is sufficiently small, return early
+      if (checkResidual(_r, tolerance)) {
+        // console.log(
+        //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
+        // );
+        const _p = p.toArray();
+        free([p, z, s, r]);
+        return _p;
+      }
+      z = r; // applyPreconditioner(r); // TODO: implement the preconditioner
+
+      // sigma' <- z dot r
+      let _sigma = kernels.math.dot(z, r);
+
+      // beta <- sigma' / sigma
+      let beta = _sigma / sigma;
+
+      // s <- z + beta * s
+      s = kernels.math.componentWiseAdd(z, kernels.math.scalarMultiply(s, beta));
+
+      // sigma <- sigma'
+      sigma = _sigma;
+    }
+
+    const _p = p.toArray();
+    free([p, z, s, r]);
+    // console.log(
+    //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
+    // );
+
+    return _p;
+  };
+
+  const checkResidual = (r, tolerance) => error(r) <= tolerance;
+  const error = (r) => r.reduce((max, n) => Math.max(max, Math.abs(n)), -1);
+  const free = (textures) => textures.map((t) => t.delete());
+
   const createAddGravityKernel = (gpu, nx, ny, nz) =>
     gpu
       .createKernel(function (velocity_y, dt) {
@@ -415,13 +505,13 @@
           let k2 = dt * vxIntermediate;
           let projectedPosition = x + k2;
           if (projectedPosition < this.constants.CELL_SIZE) {
-            projectedPosition = this.constants.CELL_SIZE;
+            projectedPosition = 1.5 * this.constants.CELL_SIZE;
           } else if (
             projectedPosition >
             (this.constants.NX - 1) * this.constants.CELL_SIZE
           ) {
             projectedPosition =
-              (this.constants.NX - 1) * this.constants.CELL_SIZE;
+              (this.constants.NX - 1.5) * this.constants.CELL_SIZE;
           }
           return projectedPosition;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
@@ -454,13 +544,13 @@
           let k2 = dt * vyIntermediate;
           let projectedPosition = y + k2;
           if (projectedPosition < this.constants.CELL_SIZE) {
-            projectedPosition = this.constants.CELL_SIZE;
+            projectedPosition = 1.5 * this.constants.CELL_SIZE;
           } else if (
             projectedPosition >
             (this.constants.NY - 1) * this.constants.CELL_SIZE
           ) {
             projectedPosition =
-              (this.constants.NY - 1) * this.constants.CELL_SIZE;
+              (this.constants.NY - 1.5) * this.constants.CELL_SIZE;
           }
           return projectedPosition;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
@@ -493,13 +583,13 @@
           let k2 = dt * vzIntermediate;
           let projectedPosition = z + k2;
           if (projectedPosition < this.constants.CELL_SIZE) {
-            projectedPosition = this.constants.CELL_SIZE;
+            projectedPosition = 1.5 * this.constants.CELL_SIZE;
           } else if (
             projectedPosition >
             (this.constants.NZ - 1) * this.constants.CELL_SIZE
           ) {
             projectedPosition =
-              (this.constants.NZ - 1) * this.constants.CELL_SIZE;
+              (this.constants.NZ - 1.5) * this.constants.CELL_SIZE;
           }
           return projectedPosition;
         } else {
@@ -1056,6 +1146,8 @@
         const i = this.thread.x;
         const j = this.thread.y;
         const k = this.thread.z;
+        const FLUID = this.constants.FLUID;
+        const SOLID = this.constants.SOLID;
 
         if (voxelStates[k][j][i] !== FLUID) {
           return 0;
@@ -1126,6 +1218,19 @@
       .setConstants({ NX: nx, NY: ny, NZ: nz })
       .setOutput([nx * ny * nz]);
 
+  const createUnflattenKernel = (gpu, nx, ny, nz) =>
+    gpu
+      .createKernel(function (flat) {
+        return flat[
+          (this.thread.z * this.constants.NY + this.thread.x) *
+            this.constants.NX +
+            this.thread.y
+        ];
+      })
+      .setTactic("precision")
+      .setConstants({ NX: nx, NY: ny, NZ: nz })
+      .setOutput([nx, ny, nz]);
+
   /**
    * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
    */
@@ -1193,6 +1298,138 @@
       })
       .setOutput([vectorLength]);
 
+  const createVelocityXUpdateKernel = (
+    gpu,
+    nx,
+    ny,
+    nz,
+    fluidDensity,
+    cellSize
+  ) =>
+    gpu
+      .createKernel(function (velocity, pressure, voxelStates, dt) {
+        // only consider boundaries which have a fluid cell on at least one side
+        if (
+          this.thread.x === 0 ||
+          this.thread.x === this.constants.NX - 1 ||
+          !(
+            voxelStates[this.thread.z][this.thread.y][this.thread.x - 1] ===
+              this.constants.FLUID ||
+            voxelStates[this.thread.z][this.thread.y][this.thread.x] ===
+              this.constants.FLUID
+          )
+        ) {
+          return 0;
+        }
+
+        const pressureGradient =
+          (pressure[this.thread.z][this.thread.y][this.thread.x] -
+            pressure[this.thread.z][this.thread.y][this.thread.x - 1]) /
+          this.constants.CELL_SIZE;
+
+        return (
+          velocity[this.thread.z][this.thread.y][this.thread.x] -
+          (dt * pressureGradient) / this.constants.FLUID_DENSITY
+        );
+      })
+      .setConstants({
+        FLUID_DENSITY: fluidDensity,
+        CELL_SIZE: cellSize,
+        NX: nx,
+        NY: ny,
+        NZ: nz,
+        FLUID: STATE_ENUM.FLUID,
+      })
+      .setOutput([nx, ny, nz]);
+
+  const createVelocityYUpdateKernel = (
+    gpu,
+    nx,
+    ny,
+    nz,
+    fluidDensity,
+    cellSize
+  ) =>
+    gpu
+      .createKernel(function (velocity, pressure, voxelStates, dt) {
+        // only consider boundaries which have a fluid cell on at least one side
+        if (
+          this.thread.y === 0 ||
+          this.thread.y === this.constants.NY - 1 ||
+          !(
+            voxelStates[this.thread.z][this.thread.y - 1][this.thread.x] ===
+              this.constants.FLUID ||
+            voxelStates[this.thread.z][this.thread.y][this.thread.x] ===
+              this.constants.FLUID
+          )
+        ) {
+          return 0;
+        }
+
+        const pressureGradient =
+          (pressure[this.thread.z][this.thread.y][this.thread.x] -
+            pressure[this.thread.z][this.thread.y - 1][this.thread.x]) /
+          this.constants.CELL_SIZE;
+
+        return (
+          velocity[this.thread.z][this.thread.y][this.thread.x] -
+          (dt * pressureGradient) / this.constants.FLUID_DENSITY
+        );
+      })
+      .setConstants({
+        FLUID_DENSITY: fluidDensity,
+        CELL_SIZE: cellSize,
+        NX: nx,
+        NY: ny,
+        NZ: nz,
+        FLUID: STATE_ENUM.FLUID,
+      })
+      .setOutput([nx, ny, nz]);
+
+  const createVelocityZUpdateKernel = (
+    gpu,
+    nx,
+    ny,
+    nz,
+    fluidDensity,
+    cellSize
+  ) =>
+    gpu
+      .createKernel(function (velocity, pressure, voxelStates, dt) {
+        // only consider boundaries which have a fluid cell on at least one side
+        if (
+          this.thread.z === 0 ||
+          this.thread.z === this.constants.NZ - 1 ||
+          !(
+            voxelStates[this.thread.z - 1][this.thread.y][this.thread.x] ===
+              this.constants.FLUID ||
+            voxelStates[this.thread.z][this.thread.y][this.thread.x] ===
+              this.constants.FLUID
+          )
+        ) {
+          return 0;
+        }
+
+        const pressureGradient =
+          (pressure[this.thread.z][this.thread.y][this.thread.x] -
+            pressure[this.thread.z - 1][this.thread.y][this.thread.x]) /
+          this.constants.CELL_SIZE;
+
+        return (
+          velocity[this.thread.z][this.thread.y][this.thread.x] -
+          (dt * pressureGradient) / this.constants.FLUID_DENSITY
+        );
+      })
+      .setConstants({
+        FLUID_DENSITY: fluidDensity,
+        CELL_SIZE: cellSize,
+        NX: nx,
+        NY: ny,
+        NZ: nz,
+        FLUID: STATE_ENUM.FLUID,
+      })
+      .setOutput([nx, ny, nz]);
+
   const compileKernels = (gpu, particles, grid) => {
     const start = Date.now();
 
@@ -1258,6 +1495,7 @@
       grid.cellSize
     );
     const flatten = createFlattenKernel(gpu, ...gridSize);
+    const unflatten = createUnflattenKernel(gpu, ...gridSize);
 
     // compile kernels to do vector operations
     const pcgVectorLength = grid.nx * grid.ny * grid.nz;
@@ -1272,10 +1510,10 @@
     const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
     const applyA = createApplyAKernel(gpu, pcgVectorLength, ...gridSize);
     const math = {
-      componentWiseAdd: componentWiseAdd.setPipeline(true),
+      componentWiseAdd: componentWiseAdd.setPipeline(true).setImmutable(true),
       dot: dot,
-      scalarMultiply: scalarMultiply.setPipeline(true),
-      applyA: applyA.setPipeline(true),
+      scalarMultiply: scalarMultiply.setPipeline(true).setImmutable(true),
+      applyA: applyA.setPipeline(true).setImmutable(true),
     };
 
     // PCG methods
@@ -1291,10 +1529,31 @@
       buildAY: buildAY.setPipeline(true),
       buildAZ: buildAZ.setPipeline(true),
       buildD: buildD.setPipeline(true),
-      flatten: flatten.setPipeline(true),
+      flatten: flatten.setPipeline(true).setImmutable(true),
+      unflatten: unflatten.setPipeline(true),
       math: math,
-      zeroVector: zeroVector.setPipeline(true),
+      zeroVector: zeroVector.setPipeline(true).setImmutable(true),
     };
+
+    // update grid velocities using the pressure gradient
+    const updateVelocityX = createVelocityXUpdateKernel(
+      gpu,
+      ...velocityXSize,
+      FLUID_DENSITY,
+      grid.cellSize
+    );
+    const updateVelocityY = createVelocityYUpdateKernel(
+      gpu,
+      ...velocityYSize,
+      FLUID_DENSITY,
+      grid.cellSize
+    );
+    const updateVelocityZ = createVelocityZUpdateKernel(
+      gpu,
+      ...velocityZSize,
+      FLUID_DENSITY,
+      grid.cellSize
+    );
 
     // update the velocities of the particles using PIC/FLIP
     const gridToParticles = createGridToParticlesKernel(
@@ -1331,11 +1590,15 @@
       gridToParticles: gridToParticles,
       advectParticles: advectParticles.setPipeline(true),
       pressureSolve: pressureSolve,
+      updateVelocityX: updateVelocityX.setPipeline(true),
+      updateVelocityY: updateVelocityY.setPipeline(true),
+      updateVelocityZ: updateVelocityZ.setPipeline(true),
     };
   };
 
-<<<<<<< HEAD
   const FLUID_DENSITY = 997;
+  const SOLVER_TOLERANCE = 1e-4;
+  const SOLVER_ITERATION_LIMIT = 200;
 
   class Simulation {
     constructor(gpu, config) {
@@ -1384,102 +1647,49 @@
       this.grid.velocityY = this.kernels.addGravity(this.grid.velocityY, dt);
 
       // enforce boundary conditions
-      //this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
+      this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
       this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
-      //this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
+      this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
       // do the pressure solve with a zero divergence velocity field
-      // TODO: implement this!
-
-      // enforce boundary conditions
-      // this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
-      // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
-      // this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
-
-      // update the velocities of the particles
-      this.particles.particleBuffer = this.kernels
-        .gridToParticles(
-          this.grid.velocityXOld,
-          this.grid.velocityYOld,
-          this.grid.velocityZOld,
-          this.grid.velocityX,
-          this.grid.velocityY,
-          this.grid.velocityZ,
-          particleBufferCopy
-        )
-        .toArray();
-      // advect the particles to find their new positions
-      this.particles.particleBuffer = this.kernels
-        .advectParticles(
-          new Float32Array(this.particles.particleBuffer),
+      this.grid.pressure = this.kernels.pressureSolve.unflatten(
+        solve(
+          this.kernels.pressureSolve,
+          this.grid.voxelStates,
           dt,
           this.grid.velocityX,
           this.grid.velocityY,
-          this.grid.velocityZ
+          this.grid.velocityZ,
+          SOLVER_TOLERANCE,
+          SOLVER_ITERATION_LIMIT
         )
-        .toArray();
-    }
-=======
-  const FLUID_DENSITY = 997;
+      );
+      console.log(this.grid.pressure.toArray()[2][2]);
 
-  class Simulation {
-    constructor(gpu, config) {
-      this.particles = new Particles(
-        config.particleDensity,
-        config.particleBounds
+      // update the velocity fields with the new pressure gradients
+      this.grid.velocityX = this.kernels.updateVelocityX(
+        this.grid.velocityX,
+        this.grid.pressure,
+        this.grid.voxelStates,
+        dt
       );
-      this.grid = new MACGrid(
-        config.gridBounds,
-        2.0 / Math.cbrt(config.particleDensity)
+      this.grid.velocityY = this.kernels.updateVelocityY(
+        this.grid.velocityY,
+        this.grid.pressure,
+        this.grid.voxelStates,
+        dt
       );
-      this.grid.addDefaultSolids();
-      this.kernels = compileKernels(gpu, this.particles, this.grid);
-    }
-
-    step(dt) {
-      let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
-      // transfer particle velocities to the grid and interpolate
-      this.grid.velocityX = this.kernels.particleToXGrid(
-        particleBufferCopy,
-        this.grid.cellSize
+      this.grid.velocityZ = this.kernels.updateVelocityZ(
+        this.grid.velocityZ,
+        this.grid.pressure,
+        this.grid.voxelStates,
+        dt
       );
-      this.grid.velocityY = this.kernels.particleToYGrid(
-        particleBufferCopy,
-        this.grid.cellSize
-      );
-      this.grid.velocityZ = this.kernels.particleToZGrid(
-        particleBufferCopy,
-        this.grid.cellSize
-      );
-
-      // copy grid values to store the old ones
-      this.grid.pressureOld = this.kernels.copyPressure(this.grid.pressure);
-      this.grid.velocityXOld = this.kernels.copyXVelocity(this.grid.velocityX);
-      this.grid.velocityYOld = this.kernels.copyYVelocity(this.grid.velocityY);
-      this.grid.velocityZOld = this.kernels.copyZVelocity(this.grid.velocityZ);
-
-      // mark cells as solid, fluid, or air
-      this.grid.voxelStates = this.kernels.classifyVoxels(
-        this.grid.voxelStates.toArray(),
-        particleBufferCopy,
-        this.grid.cellSize
-      );
-
-      // perform gravity update
-      this.grid.velocityY = this.kernels.addGravity(this.grid.velocityY, dt);
 
       // enforce boundary conditions
-      //this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
+      this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
       this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
-      //this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
-
-      // do the pressure solve with a zero divergence velocity field
-      // TODO: implement this!
-
-      // enforce boundary conditions
-      // this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
-      // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
-      // this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
+      this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
       // update the velocities of the particles
       this.particles.particleBuffer = this.kernels
@@ -1580,7 +1790,7 @@
       },
       gridBounds: {
         min: fromValues(0.1, 0.1, 0.1),
-        max: fromValues(0.9, 0.9, 0.9),
+        max: fromValues(0.9, 1.0, 0.9),
       },
     });
 
@@ -1609,8 +1819,8 @@
         return (
           Math.sqrt(
             (x_w - balls[closest][0]) * (x_w - balls[closest][0]) +
-            (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
-            (z_w - balls[closest][2]) * (z_w - balls[closest][2])
+              (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
+              (z_w - balls[closest][2]) * (z_w - balls[closest][2])
           ) - radius
         );
       })
@@ -1637,7 +1847,7 @@
               // Weighted by e^(-r^2 / c)
               let w = Math.pow(
                 2.71,
-                -1 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o) / coefficient
+                (-1 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o)) / coefficient
               );
 
               if (
@@ -1676,12 +1886,11 @@
 
       let localTime = Date.now() / 1000 - startTime;
 
-      if (deltaTime > 1 / 20) {
-        deltaTime = 1 / 20;
-      }
-
       // step the simulation forwards
-      sim.step(deltaTime);
+      deltaTime = Math.min(deltaTime, 1 / 60);
+      if (localTime < 10) {
+        sim.step(deltaTime);
+      }
 
       var uniformsConst = {
         u_field: textures[0],
@@ -1728,253 +1937,6 @@
           fillField(balls, balls.length, size, radius),
           size,
           Math.max(0.001, window.smoothSlider.value)
-        ).toArray();
-      }
-
-      // Send the field to GPU, issue draw
-      imm.begin(gl.TRIANGLES, program);
-
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        tex_level,
-        gl.RGBA,
-        tex_width,
-        tex_height,
-        0,
-        gl.RGBA,
-        gl.FLOAT,
-        field
-      );
-
-      gl.activeTexture(gl.TEXTURE0);
-
-      imm.quad2d(-1, -1, 2, 2, 1);
-      imm.end();
-    };
->>>>>>> main
-  }
-
-  /*
-   * Copyright 2010, Google Inc.
-   * All rights reserved.
-   *
-   * Redistribution and use in source and binary forms, with or without
-   * modification, are permitted provided that the following conditions are
-   * met:
-   *
-   *     * Redistributions of source code must retain the above copyright
-   * notice, this list of conditions and the following disclaimer.
-   *     * Redistributions in binary form must reproduce the above
-   * copyright notice, this list of conditions and the following disclaimer
-   * in the documentation and/or other materials provided with the
-   * distribution.
-   *     * Neither the name of Google Inc. nor the names of its
-   * contributors may be used to endorse or promote products derived from
-   * this software without specific prior written permission.
-   *
-   * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-   */
-
-  function RayMarchingEffect(resolution) {
-    var ext = gl.getExtension("OES_texture_float");
-    if (!ext) {
-      alert("this machine or browser does not support OES_texture_float");
-      return;
-    }
-
-    var arrays = tdl.primitives.createCube(1.0);
-    var program = tdl.programs.loadProgramFromScriptTags("ray_vs", "ray_fs");
-    var textures = [new tdl.textures.ExternalTexture2D()];
-
-    var model = new tdl.models.Model(program, arrays, textures);
-
-    var size = resolution;
-
-    var size3 = size * size * size;
-    var max_tex_dim = 16384;
-    if (size3 > max_tex_dim * 4) {
-      alert("Resolution too high! Something's wrong.");
-    }
-
-    var field = new Float32Array(max_tex_dim * 4);
-
-    var tex = textures[0].texture;
-    var tex_level = 0;
-    var tex_width = max_tex_dim;
-    var tex_height = 1;
-
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    var startTime = Date.now() / 1000;
-    var lastTime = startTime;
-
-    const gpu = new GPU();
-    const sim = new Simulation(gpu, {
-      particleDensity: 10000,
-      particleBounds: {
-        min: fromValues(0.3, 0.3, 0.3),
-        max: fromValues(0.7, 0.7, 0.7),
-      },
-      gridBounds: {
-        min: fromValues(0.1, 0.1, 0.1),
-        max: fromValues(0.9, 0.9, 0.9),
-      },
-    });
-
-    const fillField = gpu
-      .createKernel(function (balls, n, size, radius) {
-        let z = Math.floor(this.thread.x / (size * size));
-        let y = Math.floor(this.thread.x / size) % size;
-        let x = this.thread.x % size;
-        var z_w = z / size;
-        var y_w = y / size;
-        var x_w = x / size;
-        let closest = 0;
-        let best = 100000;
-        // if n too big will need to change loopmaxiterations
-        for (let i = 0; i < n; ++i) {
-          let cur =
-            (x_w - balls[i][0]) * (x_w - balls[i][0]) +
-            (y_w - balls[i][1]) * (y_w - balls[i][1]) +
-            (z_w - balls[i][2]) * (z_w - balls[i][2]);
-          if (cur < best) {
-            best = cur;
-            closest = i;
-          }
-        }
-
-        return (
-          Math.sqrt(
-            (x_w - balls[closest][0]) * (x_w - balls[closest][0]) +
-            (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
-            (z_w - balls[closest][2]) * (z_w - balls[closest][2])
-          ) - radius
-        );
-      })
-      .setLoopMaxIterations(10000)
-      .setPipeline(true)
-      .setOutput([max_tex_dim * 4]);
-
-    const smooth = gpu
-      .createKernel(function (field, size) {
-        let z_c = Math.floor(this.thread.x / (size * size));
-        let y_c = Math.floor(this.thread.x / size) % size;
-        let x_c = this.thread.x % size;
-
-        let sum = 0;
-        let count = 0.001; // weight must be nonzero
-        let r = 2;
-        for (let z_o = -r; z_o <= r; ++z_o) {
-          for (let y_o = -r; y_o <= r; ++y_o) {
-            for (let x_o = -r; x_o <= r; ++x_o) {
-              let x = x_c + x_o;
-              let y = y_c + y_o;
-              let z = z_c + z_o;
-
-              // Weighted by e^(-c * r^2)
-              let w = Math.pow(
-                2.71,
-                -1.5 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o)
-              );
-
-              if (
-                x < 0 ||
-                x > size - 1 ||
-                y < 0 ||
-                y > size - 1 ||
-                z < 0 ||
-                z > size - 1
-              ) {
-                // cheaper than continue, will try to read invalid data
-                w = 0.0;
-              }
-
-              sum += field[z * size * size + y * size + x] * w;
-              count += w;
-            }
-          }
-        }
-
-        return sum / count;
-      })
-      .setPipeline(true)
-      .setOutput([max_tex_dim * 4]);
-
-    this.render = function () {
-      gl.clearColor(0.0, 0.0, 0.0, 1);
-      gl.clearDepth(1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      gl.enable(gl.DEPTH_TEST);
-      gl.enable(gl.CULL_FACE);
-
-      let curTime = Date.now() / 1000;
-      let deltaTime = curTime - lastTime;
-      lastTime = curTime;
-
-      let localTime = Date.now() / 1000 - startTime;
-
-      if (deltaTime > 1 / 20) {
-        deltaTime = 1 / 20;
-      }
-
-      // step the simulation forwards
-      sim.step(deltaTime);
-
-      var uniformsConst = {
-        u_field: textures[0],
-        time: localTime,
-      };
-
-      model.drawPrep(uniformsConst);
-
-      {
-        // Set firstDraw = false to only draw 1 frame
-        
-        // Sine wave water
-        /*
-        let balls = [];
-        let n = 30;
-        let radius = 0.04;
-        
-        for (let x = 0; x < n; ++x) {
-          for (let z = 0; z < n; ++z) {
-            let xp = (x+0.5) / n;
-            let zp = (z+0.5) / n;
-            let r = Math.sqrt((xp-0.5) * (xp-0.5) + (zp-0.5) * (zp-0.5));
-            //let y = 0.1*((Math.sin(40 * r - 1.5*time) + 1) / 2) / Math.abs(10*(Math.max(r, 0.013))) + 0.05;
-            let y = 0.3 * Math.pow(Math.cos(10 * r - 1 * time), 2) / Math.max(10*r, 0.5) + 0.05;
-            balls.push([xp, y, zp]);
-          }
-        }
-        */
-
-        let balls = [];
-        let radius = 0.04;
-        for (let i = 0; i < sim.particles.particleBuffer.length; i += 6) {
-          balls.push([
-            sim.particles.particleBuffer[i],
-            sim.particles.particleBuffer[i + 1],
-            sim.particles.particleBuffer[i + 2],
-          ]);
-        }
-
-        // Swap comment to see with / without smoothing
-        //field = fillField(balls, balls.length, size, radius).toArray();
-        field = smooth(
-          fillField(balls, balls.length, size, radius),
-          size
         ).toArray();
       }
 

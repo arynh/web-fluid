@@ -1,4 +1,4 @@
-const solve = (
+export const solve = (
   kernels,
   voxelStates,
   dt,
@@ -8,13 +8,14 @@ const solve = (
   tolerance,
   iterationLimit
 ) => {
+  const start = Date.now();
+
   // build coefficient matrix
   const Adiag = kernels.buildADiag(voxelStates, dt);
   const Ax = kernels.buildAX(voxelStates, dt);
   const Ay = kernels.buildAY(voxelStates, dt);
   const Az = kernels.buildAZ(voxelStates, dt);
   // build negative divergence vector
-  // TODO: d needs to be flattened
   const d = kernels.flatten(
     kernels.buildD(voxelStates, velocityX, velocityY, velocityZ)
   );
@@ -22,14 +23,15 @@ const solve = (
   // follow PCG algorithm set out in Bridson
   let p = kernels.zeroVector();
   let r = d;
+  let _r = [];
   let z = r; // applyPreconditioner(r); // TODO: implement the preconditioner.
   let s = z;
   let sigma = kernels.math.dot(z, r);
 
   let iterationCount = 0;
-  while (!checkResidual(r, tolerance) && iterationCount < iterationLimit) {
+  while (iterationCount++ < iterationLimit) {
     // z <- As
-    z = kernels.math.applyA(Adiag, Ax, Ay, Az, s);
+    z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
 
     // alpha <- sigma / (z dot s)
     let alpha = sigma / kernels.math.dot(z, s);
@@ -42,12 +44,24 @@ const solve = (
       r,
       kernels.math.scalarMultiply(z, -alpha)
     );
-    console.log(`error at iteration ${iterationCount}: ${error(r)}`);
 
-    if (checkResidual(r, tolerance)) {
-      return p;
+    // transfer r to CPU to do error calculation
+    _r = r.toArray();
+
+    if (iterationCount % 50 === 0) {
+      console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
     }
 
+    // if the residual is sufficiently small, return early
+    if (checkResidual(_r, tolerance)) {
+      const end = Date.now();
+      // console.log(
+      //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
+      // );
+      const _p = p.toArray();
+      free([p, z, s, r]);
+      return _p;
+    }
     z = r; // applyPreconditioner(r); // TODO: implement the preconditioner
 
     // sigma' <- z dot r
@@ -61,14 +75,21 @@ const solve = (
 
     // sigma <- sigma'
     sigma = _sigma;
-
-    iterationCount++;
   }
 
-  console.error("Maximum iterations used in PCG solver!");
+  const _p = p.toArray();
+  free([p, z, s, r]);
 
-  return p;
+  // console.error("Maximum iterations used in PCG solver!");
+
+  const end = Date.now();
+  // console.log(
+  //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
+  // );
+
+  return _p;
 };
 
 const checkResidual = (r, tolerance) => error(r) <= tolerance;
 const error = (r) => r.reduce((max, n) => Math.max(max, Math.abs(n)), -1);
+const free = (textures) => textures.map((t) => t.delete());

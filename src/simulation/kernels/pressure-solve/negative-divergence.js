@@ -7,6 +7,8 @@ export const createNegativeDivergenceKernel = (gpu, nx, ny, nz, cellSize) =>
       const i = this.thread.x;
       const j = this.thread.y;
       const k = this.thread.z;
+      const FLUID = this.constants.FLUID;
+      const SOLID = this.constants.SOLID;
 
       if (voxelStates[k][j][i] !== FLUID) {
         return 0;

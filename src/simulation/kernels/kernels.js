@@ -21,8 +21,17 @@ import {
   createAZKernel,
 } from "./pressure-solve/build-coefficient-matrix.js";
 import { createNegativeDivergenceKernel } from "./pressure-solve/negative-divergence.js";
-import { createFlattenKernel } from "./pressure-solve/flatten.js";
+import {
+  createFlattenKernel,
+  createUnflattenKernel,
+} from "./pressure-solve/flatten.js";
 import { createApplyAKernel } from "./pressure-solve/apply-a.js";
+import {
+  createVelocityXUpdateKernel,
+  createVelocityYUpdateKernel,
+  createVelocityZUpdateKernel,
+} from "./velocity-update.js";
+import { FLUID_DENSITY } from "../simulation.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
@@ -89,6 +98,7 @@ export const compileKernels = (gpu, particles, grid) => {
     grid.cellSize
   );
   const flatten = createFlattenKernel(gpu, ...gridSize);
+  const unflatten = createUnflattenKernel(gpu, ...gridSize);
 
   // compile kernels to do vector operations
   const pcgVectorLength = grid.nx * grid.ny * grid.nz;
@@ -103,10 +113,10 @@ export const compileKernels = (gpu, particles, grid) => {
   const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
   const applyA = createApplyAKernel(gpu, pcgVectorLength, ...gridSize);
   const math = {
-    componentWiseAdd: componentWiseAdd.setPipeline(true),
+    componentWiseAdd: componentWiseAdd.setPipeline(true).setImmutable(true),
     dot: dot,
-    scalarMultiply: scalarMultiply.setPipeline(true),
-    applyA: applyA.setPipeline(true),
+    scalarMultiply: scalarMultiply.setPipeline(true).setImmutable(true),
+    applyA: applyA.setPipeline(true).setImmutable(true),
   };
 
   // PCG methods
@@ -122,10 +132,31 @@ export const compileKernels = (gpu, particles, grid) => {
     buildAY: buildAY.setPipeline(true),
     buildAZ: buildAZ.setPipeline(true),
     buildD: buildD.setPipeline(true),
-    flatten: flatten.setPipeline(true),
+    flatten: flatten.setPipeline(true).setImmutable(true),
+    unflatten: unflatten.setPipeline(true),
     math: math,
-    zeroVector: zeroVector.setPipeline(true),
+    zeroVector: zeroVector.setPipeline(true).setImmutable(true),
   };
+
+  // update grid velocities using the pressure gradient
+  const updateVelocityX = createVelocityXUpdateKernel(
+    gpu,
+    ...velocityXSize,
+    FLUID_DENSITY,
+    grid.cellSize
+  );
+  const updateVelocityY = createVelocityYUpdateKernel(
+    gpu,
+    ...velocityYSize,
+    FLUID_DENSITY,
+    grid.cellSize
+  );
+  const updateVelocityZ = createVelocityZUpdateKernel(
+    gpu,
+    ...velocityZSize,
+    FLUID_DENSITY,
+    grid.cellSize
+  );
 
   // update the velocities of the particles using PIC/FLIP
   const gridToParticles = createGridToParticlesKernel(
@@ -162,5 +193,8 @@ export const compileKernels = (gpu, particles, grid) => {
     gridToParticles: gridToParticles,
     advectParticles: advectParticles.setPipeline(true),
     pressureSolve: pressureSolve,
+    updateVelocityX: updateVelocityX.setPipeline(true),
+    updateVelocityY: updateVelocityY.setPipeline(true),
+    updateVelocityZ: updateVelocityZ.setPipeline(true),
   };
 };

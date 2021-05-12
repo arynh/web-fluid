@@ -50,11 +50,11 @@ export class MACGrid {
     this.nz = this.count[2] - 1;
     this.pressure = initialize3DArray(this.nx, this.ny, this.nz);
     this.pressureOld = null;
-    this.velocityX = [[["hi"]]]; //initialize3DArray(this.nx + 1, this.ny, this.nz);
+    this.velocityX = null;
     this.velocityXOld = null;
-    this.velocityY = null; //initialize3DArray(this.nx, this.ny + 1, this.nz);
+    this.velocityY = null;
     this.velocityYOld = null;
-    this.velocityZ = null; //initialize3DArray(this.nx, this.ny, this.nz + 1);
+    this.velocityZ = null;
     this.velocityZOld = null;
 
     // initialize voxel states

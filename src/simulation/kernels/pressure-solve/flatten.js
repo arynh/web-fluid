@@ -18,3 +18,16 @@ export const createFlattenKernel = (gpu, nx, ny, nz) =>
     .setTactic("precision")
     .setConstants({ NX: nx, NY: ny, NZ: nz })
     .setOutput([nx * ny * nz]);
+
+export const createUnflattenKernel = (gpu, nx, ny, nz) =>
+  gpu
+    .createKernel(function (flat) {
+      return flat[
+        (this.thread.z * this.constants.NY + this.thread.x) *
+          this.constants.NX +
+          this.thread.y
+      ];
+    })
+    .setTactic("precision")
+    .setConstants({ NX: nx, NY: ny, NZ: nz })
+    .setOutput([nx, ny, nz]);
