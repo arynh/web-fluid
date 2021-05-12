@@ -30,29 +30,3 @@ export const createScalarMultiplyKernel = (gpu, vectorLength) =>
     })
     .setTactic("precision") // vector math should be high precision
     .setOutput([vectorLength]);
-
-/**
- * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
- */
-export const createApplyAKernel = (gpu, vectorLength) =>
-  gpu
-    .createKernel(function (Adiag, Ax, Ay, Az, x) {
-      const aux = this.thread.x % (this.constants.NX * this.constants.NY);
-      const i = Math.floor(aux / this.constants.NY);
-      const j = aux % this.constants.NX;
-      const k = Math.floor(
-        this.thread.x / (this.constants.NX * this.constants.NY)
-      );
-
-      if (this.thread.x === 0) {
-      } else if (this.thread.x === 1) {
-      } else if (this.thread.x === 2) {
-      } else if (this.thread.x === 3) {
-      } else if (this.thread.x === 4) {
-      } else if (this.thread.x === 5) {
-      }
-    })
-    .addFunction(function () {})
-    .setTactic("precision") // vector math should be high precision
-    .setConstants({ VECTOR_LENGTH: vectorLength })
-    .setOutput([vectorLength]);

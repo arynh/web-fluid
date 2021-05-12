@@ -10,7 +10,6 @@ import {
 import { createParticleToGridKernel } from "./transfer-particle-to-grid.js";
 import { createGridToParticlesKernel } from "./transfer-grid-to-particles.js";
 import {
-  createApplyAKernel,
   createComponentWiseAddKernel,
   createComponentWiseMultiplyKernel,
   createScalarMultiplyKernel,
@@ -23,6 +22,7 @@ import {
 } from "./pressure-solve/build-coefficient-matrix.js";
 import { createNegativeDivergenceKernel } from "./pressure-solve/negative-divergence.js";
 import { createFlattenKernel } from "./pressure-solve/flatten.js";
+import { createApplyAKernel } from "./pressure-solve/apply-a.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();

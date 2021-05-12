@@ -8,7 +8,7 @@ export const createNegativeDivergenceKernel = (gpu, nx, ny, nz, cellSize) =>
       const j = this.thread.y;
       const k = this.thread.z;
 
-      if (voxelStates[i][j][k] !== FLUID) {
+      if (voxelStates[k][j][i] !== FLUID) {
         return 0;
       }
 
@@ -16,34 +16,34 @@ export const createNegativeDivergenceKernel = (gpu, nx, ny, nz, cellSize) =>
 
       let divergence =
         -scale *
-        (velocityX[i + 1][j][k] -
-          velocityX[i][j][k] +
-          velocityY[i][j + 1][k] -
-          velocityY[i][j][k] +
-          velocityZ[i][j][k + 1] -
-          velocityZ[i][j][k]);
+        (velocityX[k][j][i + 1] -
+          velocityX[k][j][i] +
+          velocityY[k][j + 1][i] -
+          velocityY[k][j][i] +
+          velocityZ[k + 1][j][i] -
+          velocityZ[k][j][i]);
 
       // modifying RHS (divergence) to account for solid velocities
-      if (voxelStates[i - 1][j][k] === SOLID) {
-        divergence -= scale * velocityX[i][j][k];
+      if (voxelStates[k][j][i - 1] === SOLID) {
+        divergence -= scale * velocityX[k][j][i];
       }
-      if (voxelStates[i + 1][j][k] === SOLID) {
-        divergence += scale * velocityX[i + 1][j][k];
-      }
-
-      if (voxelStates[i][j - 1][k] === SOLID) {
-        divergence -= scale * velocityY[i][j][k];
-      }
-      if (voxelStates[i][j + 1][k] === SOLID) {
-        divergence += scale * velocityY[i][j + 1][k];
+      if (voxelStates[k][j][i + 1] === SOLID) {
+        divergence += scale * velocityX[k][j][i + 1];
       }
 
-      if (voxelStates[i][j][k - 1] === SOLID) {
-        divergence -= scale * velocityZ[i][j][k];
+      if (voxelStates[k][j - 1][i] === SOLID) {
+        divergence -= scale * velocityY[k][j][i];
+      }
+      if (voxelStates[k][j + 1][i] === SOLID) {
+        divergence += scale * velocityY[k][j + 1][i];
       }
 
-      if (voxelStates[i][j][k + 1] === SOLID) {
-        divergence += scale * velocityZ[i][j][k + 1];
+      if (voxelStates[k - 1][j][i] === SOLID) {
+        divergence -= scale * velocityZ[k][j][i];
+      }
+
+      if (voxelStates[k + 1][j][i] === SOLID) {
+        divergence += scale * velocityZ[k + 1][j][i];
       }
 
       return divergence;

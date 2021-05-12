@@ -19,7 +19,7 @@ export const createADiagKernel = (gpu, nx, ny, nz, cellSize) =>
       const AIR = this.constants.AIR;
 
       // only consider fluid cells
-      if (voxelStates[i][j][k] !== FLUID) {
+      if (voxelStates[k][j][i] !== FLUID) {
         return 0;
       }
 
@@ -32,37 +32,37 @@ export const createADiagKernel = (gpu, nx, ny, nz, cellSize) =>
       let accumulator = 0;
 
       // negative x neighbor
-      if (voxelStates[i - 1][j][k] === FLUID) {
+      if (voxelStates[k][j][i - 1] === FLUID) {
         accumulator += scale;
       }
       // positive x neighbor
       if (
-        voxelStates[i + 1][j][k] === FLUID ||
-        voxelStates[i + 1][j][k] === AIR
+        voxelStates[k][j][i + 1] === FLUID ||
+        voxelStates[k][j][i + 1] === AIR
       ) {
         accumulator += scale;
       }
 
       // negative y neighbor
-      if (voxelStates[i][j - 1][k] === FLUID) {
+      if (voxelStates[k][j - 1][i] === FLUID) {
         accumulator += scale;
       }
       // positive y neighbor
       if (
-        voxelStates[i][j + 1][k] === FLUID ||
-        voxelStates[i][j + 1][k] === AIR
+        voxelStates[k][j + 1][i] === FLUID ||
+        voxelStates[k][j + 1][i] === AIR
       ) {
         accumulator += scale;
       }
 
       // negative z neighbor
-      if (voxelStates[i][j][k - 1] === FLUID) {
+      if (voxelStates[k - 1][j][i] === FLUID) {
         accumulator += scale;
       }
       // positive z neighbor
       if (
-        voxelStates[i][j][k + 1] === FLUID ||
-        voxelStates[i][j][k + 1] === AIR
+        voxelStates[k + 1][j][i] === FLUID ||
+        voxelStates[k + 1][j][i] === AIR
       ) {
         accumulator += scale;
       }
@@ -89,7 +89,7 @@ export const createAXKernel = (gpu, nx, ny, nz, cellSize) =>
       const FLUID = this.constants.FLUID;
 
       // only consider fluid cells
-      if (voxelStates[i][j][k] !== FLUID) {
+      if (voxelStates[k][j][i] !== FLUID) {
         return 0;
       }
 
@@ -101,7 +101,7 @@ export const createAXKernel = (gpu, nx, ny, nz, cellSize) =>
 
       let accumulator = 0;
       //positive x neighbor
-      if (voxelStates[(i + 1, j, k)] === FLUID) {
+      if (voxelStates[k][j][i + 1] === FLUID) {
         accumulator = -scale;
       }
       return accumulator;
@@ -126,7 +126,7 @@ export const createAYKernel = (gpu, nx, ny, nz, cellSize) =>
       const FLUID = this.constants.FLUID;
 
       // only consider fluid cells
-      if (voxelStates[i][j][k] !== FLUID) {
+      if (voxelStates[k][j][i] !== FLUID) {
         return 0;
       }
 
@@ -138,7 +138,7 @@ export const createAYKernel = (gpu, nx, ny, nz, cellSize) =>
 
       let accumulator = 0;
       //positive y neighbor
-      if (voxelStates[(i, j + 1, k)] === FLUID) {
+      if (voxelStates[k][j + 1][i] === FLUID) {
         accumulator = -scale;
       }
       return accumulator;
@@ -163,7 +163,7 @@ export const createAZKernel = (gpu, nx, ny, nz, cellSize) =>
       const FLUID = this.constants.FLUID;
 
       // only consider fluid cells
-      if (voxelStates[i][j][k] !== FLUID) {
+      if (voxelStates[k][j][i] !== FLUID) {
         return 0;
       }
 
@@ -175,7 +175,7 @@ export const createAZKernel = (gpu, nx, ny, nz, cellSize) =>
 
       let accumulator = 0;
       //positive z neighbor
-      if (voxelStates[(i, j, k + 1)] === FLUID) {
+      if (voxelStates[k + 1][j][i] === FLUID) {
         accumulator = -scale;
       }
       return accumulator;
