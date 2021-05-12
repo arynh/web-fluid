@@ -73,11 +73,11 @@ function RayMarchingEffect(resolution, density) {
     particleDensity: density,
     particleBounds: {
       min: vec3.fromValues(0.3, 0.3, 0.3),
-      max: vec3.fromValues(0.7, 0.7, 0.7),
+      max: vec3.fromValues(0.7, 0.6, 0.7),
     },
     gridBounds: {
       min: vec3.fromValues(0.1, 0.1, 0.1),
-      max: vec3.fromValues(0.9, 1.0, 0.9),
+      max: vec3.fromValues(0.9, 0.9, 0.9),
     },
   });
 
@@ -174,8 +174,8 @@ function RayMarchingEffect(resolution, density) {
     let localTime = Date.now() / 1000 - startTime;
 
     // step the simulation forwards
-    deltaTime = Math.min(deltaTime, 1 / 60);
-    if (localTime < 10) {
+    deltaTime = Math.min(deltaTime, 1 / 200);
+    if (localTime < 150) {
       sim.step(deltaTime);
     }
 

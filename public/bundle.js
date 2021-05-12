@@ -369,6 +369,7 @@
     tolerance,
     iterationLimit
   ) => {
+    const start = Date.now();
 
     // build coefficient matrix
     const Adiag = kernels.buildADiag(voxelStates, dt);
@@ -379,10 +380,24 @@
     const d = kernels.flatten(
       kernels.buildD(voxelStates, velocityX, velocityY, velocityZ)
     );
+    // console.log("d:");
+    // console.log(d.toArray());
+    // console.log("error:");
+    // console.log(error(d.toArray()));
 
     // follow PCG algorithm set out in Bridson
     let p = kernels.zeroVector();
     let r = d;
+
+    // check if there is a trivial solution
+    if (checkResidual(r.toArray(), tolerance)) {
+      const end = Date.now();
+      console.log(`Solver took 0 iterations in ${end - start} ms.`);
+      const _p = p.toArray();
+      free([p, r]);
+      return _p;
+    }
+
     let _r = [];
     let z = r; // applyPreconditioner(r); // TODO: implement the preconditioner.
     let s = z;
@@ -392,6 +407,15 @@
     while (iterationCount++ < iterationLimit) {
       // z <- As
       z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
+      // console.log("A:");
+      // console.log(Adiag.toArray());
+      // console.log(Ax.toArray());
+      // console.log(Ay.toArray());
+      // console.log(Az.toArray());
+      // console.log("S:");
+      // console.log(s.toArray());
+      // console.log("z <- As:");
+      // console.log(z.toArray());
 
       // alpha <- sigma / (z dot s)
       let alpha = sigma / kernels.math.dot(z, s);
@@ -408,9 +432,9 @@
       // transfer r to CPU to do error calculation
       _r = r.toArray();
 
-      if (iterationCount % 50 === 0) {
-        console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
-      }
+      // if (iterationCount % 50 === 0) {
+      //   console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
+      // }
 
       // if the residual is sufficiently small, return early
       if (checkResidual(_r, tolerance)) {
@@ -1598,7 +1622,7 @@
 
   const FLUID_DENSITY = 997;
   const SOLVER_TOLERANCE = 1e-4;
-  const SOLVER_ITERATION_LIMIT = 200;
+  const SOLVER_ITERATION_LIMIT = 100;
 
   class Simulation {
     constructor(gpu, config) {
@@ -1664,7 +1688,7 @@
           SOLVER_ITERATION_LIMIT
         )
       );
-      console.log(this.grid.pressure.toArray()[2][2]);
+      // console.log(this.grid.pressure.toArray());
 
       // update the velocity fields with the new pressure gradients
       this.grid.velocityX = this.kernels.updateVelocityX(
@@ -1786,11 +1810,11 @@
       particleDensity: density,
       particleBounds: {
         min: fromValues(0.3, 0.3, 0.3),
-        max: fromValues(0.7, 0.7, 0.7),
+        max: fromValues(0.7, 0.6, 0.7),
       },
       gridBounds: {
         min: fromValues(0.1, 0.1, 0.1),
-        max: fromValues(0.9, 1.0, 0.9),
+        max: fromValues(0.9, 0.9, 0.9),
       },
     });
 
@@ -1887,8 +1911,8 @@
       let localTime = Date.now() / 1000 - startTime;
 
       // step the simulation forwards
-      deltaTime = Math.min(deltaTime, 1 / 60);
-      if (localTime < 10) {
+      deltaTime = Math.min(deltaTime, 1 / 200);
+      if (localTime < 150) {
         sim.step(deltaTime);
       }
 

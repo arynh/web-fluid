@@ -19,10 +19,24 @@ export const solve = (
   const d = kernels.flatten(
     kernels.buildD(voxelStates, velocityX, velocityY, velocityZ)
   );
+  // console.log("d:");
+  // console.log(d.toArray());
+  // console.log("error:");
+  // console.log(error(d.toArray()));
 
   // follow PCG algorithm set out in Bridson
   let p = kernels.zeroVector();
   let r = d;
+
+  // check if there is a trivial solution
+  if (checkResidual(r.toArray(), tolerance)) {
+    const end = Date.now();
+    console.log(`Solver took 0 iterations in ${end - start} ms.`);
+    const _p = p.toArray();
+    free([p, r]);
+    return _p;
+  }
+
   let _r = [];
   let z = r; // applyPreconditioner(r); // TODO: implement the preconditioner.
   let s = z;
@@ -32,6 +46,15 @@ export const solve = (
   while (iterationCount++ < iterationLimit) {
     // z <- As
     z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
+    // console.log("A:");
+    // console.log(Adiag.toArray());
+    // console.log(Ax.toArray());
+    // console.log(Ay.toArray());
+    // console.log(Az.toArray());
+    // console.log("S:");
+    // console.log(s.toArray());
+    // console.log("z <- As:");
+    // console.log(z.toArray());
 
     // alpha <- sigma / (z dot s)
     let alpha = sigma / kernels.math.dot(z, s);
@@ -48,9 +71,9 @@ export const solve = (
     // transfer r to CPU to do error calculation
     _r = r.toArray();
 
-    if (iterationCount % 50 === 0) {
-      console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
-    }
+    // if (iterationCount % 50 === 0) {
+    //   console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
+    // }
 
     // if the residual is sufficiently small, return early
     if (checkResidual(_r, tolerance)) {

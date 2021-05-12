@@ -5,7 +5,7 @@ import { compileKernels } from "./kernels/kernels.js";
 
 export const FLUID_DENSITY = 997;
 const SOLVER_TOLERANCE = 1e-4;
-const SOLVER_ITERATION_LIMIT = 200;
+const SOLVER_ITERATION_LIMIT = 100;
 
 export class Simulation {
   constructor(gpu, config) {
@@ -71,7 +71,7 @@ export class Simulation {
         SOLVER_ITERATION_LIMIT
       )
     );
-    console.log(this.grid.pressure.toArray()[2][2]);
+    // console.log(this.grid.pressure.toArray());
 
     // update the velocity fields with the new pressure gradients
     this.grid.velocityX = this.kernels.updateVelocityX(
