@@ -176,9 +176,9 @@ function RayMarchingEffect(resolution, density) {
 
     // step the simulation forwards
     deltaTime = Math.min(deltaTime, 1 / 60);
-    if (localTime < 150) {
-      sim.step(deltaTime);
-    }
+    // if (localTime < 150) {
+    sim.step(deltaTime);
+    // }
 
     var uniformsConst = {
       u_field: textures[0],

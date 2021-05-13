@@ -250,7 +250,7 @@
       this.ny = this.count[1] - 1;
       this.nz = this.count[2] - 1;
       this.pressure = initialize3DArray(this.nx, this.ny, this.nz);
-      this.pressureOld = null;
+      this.pressureOld = initialize3DArray(this.nx, this.ny, this.nz);
       this.velocityX = null;
       this.velocityXOld = null;
       this.velocityY = null;
@@ -375,6 +375,8 @@
     let p = pressureOld;
 
     const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
+    // console.log("divergence:");
+    // console.log(d); //.toArray());
 
     // JACOBI ITERATION
     for (let i = 0; i < iterationLimit; i++) {
@@ -384,7 +386,6 @@
     return p;
 
     /* PCG METHOD
-
 
     // build coefficient matrix
     const Adiag = kernels.buildADiag(voxelStates, dt);
@@ -420,7 +421,6 @@
 
     let iterationCount = 0;
     while (iterationCount++ < iterationLimit) {
-
       // z <- As
       z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
       // console.log("A:");
@@ -434,7 +434,7 @@
       // console.log(z.toArray());
 
       // alpha <- sigma / (z dot s)
-      let alpha = sigma / kernels.math.dot(z, s);
+      let alpha = kernels.math.dot(z, s);
 
       // p <- p + alpha * s
       p = kernels.math.componentWiseAdd(p, kernels.math.scalarMultiply(s, alpha));
@@ -546,14 +546,13 @@
           );
           let k2 = dt * vxIntermediate;
           let projectedPosition = x + k2;
-          if (projectedPosition < this.constants.CELL_SIZE) {
-            projectedPosition = 1.5 * this.constants.CELL_SIZE;
+          if (projectedPosition < 0) {
+            projectedPosition = 0;
           } else if (
             projectedPosition >
-            (this.constants.NX - 1) * this.constants.CELL_SIZE
+            this.constants.NX * this.constants.CELL_SIZE
           ) {
-            projectedPosition =
-              (this.constants.NX - 1.5) * this.constants.CELL_SIZE;
+            projectedPosition = this.constants.NX * this.constants.CELL_SIZE;
           }
           return projectedPosition;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
@@ -585,14 +584,13 @@
           );
           let k2 = dt * vyIntermediate;
           let projectedPosition = y + k2;
-          if (projectedPosition < this.constants.CELL_SIZE) {
-            projectedPosition = 1.5 * this.constants.CELL_SIZE;
+          if (projectedPosition < 0) {
+            projectedPosition = 0;
           } else if (
             projectedPosition >
-            (this.constants.NY - 1) * this.constants.CELL_SIZE
+            this.constants.NY * this.constants.CELL_SIZE
           ) {
-            projectedPosition =
-              (this.constants.NY - 1.5) * this.constants.CELL_SIZE;
+            projectedPosition = this.constants.NY * this.constants.CELL_SIZE;
           }
           return projectedPosition;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
@@ -624,14 +622,13 @@
           );
           let k2 = dt * vzIntermediate;
           let projectedPosition = z + k2;
-          if (projectedPosition < this.constants.CELL_SIZE) {
-            projectedPosition = 1.5 * this.constants.CELL_SIZE;
+          if (projectedPosition < 0) {
+            projectedPosition = 0;
           } else if (
             projectedPosition >
-            (this.constants.NZ - 1) * this.constants.CELL_SIZE
+            this.constants.NZ * this.constants.CELL_SIZE
           ) {
-            projectedPosition =
-              (this.constants.NZ - 1.5) * this.constants.CELL_SIZE;
+            projectedPosition = this.constants.NZ * this.constants.CELL_SIZE;
           }
           return projectedPosition;
         } else {
@@ -724,7 +721,7 @@
   const createEnforceBoundaryXKernel = (gpu, nx, ny, nz) =>
     gpu
       .createKernel(function (velocities) {
-        if (this.thread.x === 1 || this.thread.x === this.constants.nx - 2) {
+        if (this.thread.x === 0 || this.thread.x === this.constants.nx - 1) {
           return 0;
         }
         return velocities[this.thread.z][this.thread.y][this.thread.x];
@@ -735,7 +732,7 @@
   const createEnforceBoundaryYKernel = (gpu, nx, ny, nz) =>
     gpu
       .createKernel(function (velocities) {
-        if (this.thread.y === 1 || this.thread.y === this.constants.ny - 2) {
+        if (this.thread.y === 0 || this.thread.y === this.constants.ny - 1) {
           return 0;
         }
         return velocities[this.thread.z][this.thread.y][this.thread.x];
@@ -746,7 +743,7 @@
   const createEnforceBoundaryZKernel = (gpu, nx, ny, nz) =>
     gpu
       .createKernel(function (velocities) {
-        if (this.thread.z === 1 || this.thread.z === this.constants.nz - 2) {
+        if (this.thread.z === 0 || this.thread.z === this.constants.nz - 1) {
           return 0;
         }
         return velocities[this.thread.z][this.thread.y][this.thread.x];
@@ -1359,7 +1356,7 @@
               this.constants.FLUID
           )
         ) {
-          return 0;
+          return -0;
         }
 
         const pressureGradient =
@@ -1367,10 +1364,15 @@
             pressure[this.thread.z][this.thread.y][this.thread.x - 1]) /
           this.constants.CELL_SIZE;
 
-        return (
-          velocity[this.thread.z][this.thread.y][this.thread.x] -
-          (dt * pressureGradient) / this.constants.FLUID_DENSITY
-        );
+        // if (pressureGradient !== 0) {
+        //   debugger;
+        // }
+
+        const oldVelocity = velocity[this.thread.z][this.thread.y][this.thread.x];
+        const newVelocity =
+          oldVelocity - (dt * pressureGradient) / this.constants.FLUID_DENSITY;
+
+        return newVelocity;
       })
       .setConstants({
         FLUID_DENSITY: fluidDensity,
@@ -1403,7 +1405,7 @@
               this.constants.FLUID
           )
         ) {
-          return 0;
+          return velocity[this.thread.z][this.thread.y][this.thread.x];
         }
 
         const pressureGradient =
@@ -1414,10 +1416,6 @@
         const oldVelocity = velocity[this.thread.z][this.thread.y][this.thread.x];
         const newVelocity =
           oldVelocity - (dt * pressureGradient) / this.constants.FLUID_DENSITY;
-
-        // if (newVelocity > 0) {
-        //   debugger;
-        // }
 
         return newVelocity;
       })
@@ -1485,7 +1483,7 @@
         if (voxelStates[k][j][i] === this.constants.AIR) {
           return 0;
         } else if (voxelStates[k][j][i] === this.constants.SOLID) {
-          return 100000;
+          return 100;
         }
 
         const divergenceCenter = negativeDivergence[k][j][i];
@@ -1634,7 +1632,7 @@
       buildAX: buildAX.setPipeline(true),
       buildAY: buildAY.setPipeline(true),
       buildAZ: buildAZ.setPipeline(true),
-      buildD: buildD.setPipeline(true),
+      buildD: buildD.setPipeline(true).setImmutable(true),
       flatten: flatten.setPipeline(true).setImmutable(true),
       unflatten: unflatten.setPipeline(true),
       math: math,
@@ -1703,7 +1701,7 @@
     };
   };
 
-  const FLUID_DENSITY = 997;
+  const FLUID_DENSITY = 0.997;
   const SOLVER_TOLERANCE = 1e-4;
   const SOLVER_ITERATION_LIMIT = 200;
 
@@ -1717,7 +1715,6 @@
         config.gridBounds,
         2.0 / Math.cbrt(config.particleDensity)
       );
-      this.grid.addDefaultSolids();
       this.kernels = compileKernels(gpu, this.particles, this.grid);
     }
 
@@ -1771,6 +1768,8 @@
         this.grid.pressure,
         this.grid.pressureOld
       );
+      // console.log("pressure:");
+      // console.log(this.grid.pressure); //.toArray());
 
       // update the velocity fields with the new pressure gradients
       this.grid.velocityX = this.kernels.updateVelocityX(
@@ -1779,12 +1778,16 @@
         this.grid.voxelStates,
         dt
       );
+      // console.log("old y velocity:");
+      // console.log(this.grid.velocityY); //.toArray());
       this.grid.velocityY = this.kernels.updateVelocityY(
         this.grid.velocityY,
         this.grid.pressure,
         this.grid.voxelStates,
         dt
       );
+      // console.log("new y velocity:");
+      // console.log(this.grid.velocityY); //.toArray());
       this.grid.velocityZ = this.kernels.updateVelocityZ(
         this.grid.velocityZ,
         this.grid.pressure,
@@ -1792,7 +1795,7 @@
         dt
       );
 
-      // enforce boundary conditions
+      // // enforce boundary conditions
       this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
       this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
       this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
@@ -1995,9 +1998,9 @@
 
       // step the simulation forwards
       deltaTime = Math.min(deltaTime, 1 / 60);
-      if (localTime < 150) {
-        sim.step(deltaTime);
-      }
+      // if (localTime < 150) {
+      sim.step(deltaTime);
+      // }
 
       var uniformsConst = {
         u_field: textures[0],

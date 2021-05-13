@@ -15,6 +15,8 @@ export const solve = (
   let p = pressureOld;
 
   const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
+  // console.log("divergence:");
+  // console.log(d); //.toArray());
 
   // JACOBI ITERATION
   for (let i = 0; i < iterationLimit; i++) {
@@ -24,7 +26,6 @@ export const solve = (
   return p;
 
   /* PCG METHOD
-
 
   // build coefficient matrix
   const Adiag = kernels.buildADiag(voxelStates, dt);
@@ -60,7 +61,6 @@ export const solve = (
 
   let iterationCount = 0;
   while (iterationCount++ < iterationLimit) {
-
     // z <- As
     z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
     // console.log("A:");
@@ -74,7 +74,7 @@ export const solve = (
     // console.log(z.toArray());
 
     // alpha <- sigma / (z dot s)
-    let alpha = sigma / kernels.math.dot(z, s);
+    let alpha = kernels.math.dot(z, s);
 
     // p <- p + alpha * s
     p = kernels.math.componentWiseAdd(p, kernels.math.scalarMultiply(s, alpha));

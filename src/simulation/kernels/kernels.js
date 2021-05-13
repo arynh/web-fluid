@@ -134,7 +134,7 @@ export const compileKernels = (gpu, particles, grid) => {
     buildAX: buildAX.setPipeline(true),
     buildAY: buildAY.setPipeline(true),
     buildAZ: buildAZ.setPipeline(true),
-    buildD: buildD.setPipeline(true),
+    buildD: buildD.setPipeline(true).setImmutable(true),
     flatten: flatten.setPipeline(true).setImmutable(true),
     unflatten: unflatten.setPipeline(true),
     math: math,

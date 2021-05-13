@@ -3,7 +3,7 @@ import { Particles } from "./particles.js";
 import { solve } from "./pressure-solve.js";
 import { compileKernels } from "./kernels/kernels.js";
 
-export const FLUID_DENSITY = 997;
+export const FLUID_DENSITY = 0.997;
 const SOLVER_TOLERANCE = 1e-4;
 const SOLVER_ITERATION_LIMIT = 200;
 
@@ -17,7 +17,6 @@ export class Simulation {
       config.gridBounds,
       2.0 / Math.cbrt(config.particleDensity)
     );
-    this.grid.addDefaultSolids();
     this.kernels = compileKernels(gpu, this.particles, this.grid);
   }
 
@@ -71,6 +70,8 @@ export class Simulation {
       this.grid.pressure,
       this.grid.pressureOld
     );
+    // console.log("pressure:");
+    // console.log(this.grid.pressure); //.toArray());
 
     // update the velocity fields with the new pressure gradients
     this.grid.velocityX = this.kernels.updateVelocityX(
@@ -79,12 +80,16 @@ export class Simulation {
       this.grid.voxelStates,
       dt
     );
+    // console.log("old y velocity:");
+    // console.log(this.grid.velocityY); //.toArray());
     this.grid.velocityY = this.kernels.updateVelocityY(
       this.grid.velocityY,
       this.grid.pressure,
       this.grid.voxelStates,
       dt
     );
+    // console.log("new y velocity:");
+    // console.log(this.grid.velocityY); //.toArray());
     this.grid.velocityZ = this.kernels.updateVelocityZ(
       this.grid.velocityZ,
       this.grid.pressure,
@@ -92,7 +97,7 @@ export class Simulation {
       dt
     );
 
-    // enforce boundary conditions
+    // // enforce boundary conditions
     this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
     this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
     this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);

@@ -7,7 +7,7 @@
 export const createEnforceBoundaryXKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (velocities) {
-      if (this.thread.x === 1 || this.thread.x === this.constants.nx - 2) {
+      if (this.thread.x === 0 || this.thread.x === this.constants.nx - 1) {
         return 0;
       }
       return velocities[this.thread.z][this.thread.y][this.thread.x];
@@ -18,7 +18,7 @@ export const createEnforceBoundaryXKernel = (gpu, nx, ny, nz) =>
 export const createEnforceBoundaryYKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (velocities) {
-      if (this.thread.y === 1 || this.thread.y === this.constants.ny - 2) {
+      if (this.thread.y === 0 || this.thread.y === this.constants.ny - 1) {
         return 0;
       }
       return velocities[this.thread.z][this.thread.y][this.thread.x];
@@ -29,7 +29,7 @@ export const createEnforceBoundaryYKernel = (gpu, nx, ny, nz) =>
 export const createEnforceBoundaryZKernel = (gpu, nx, ny, nz) =>
   gpu
     .createKernel(function (velocities) {
-      if (this.thread.z === 1 || this.thread.z === this.constants.nz - 2) {
+      if (this.thread.z === 0 || this.thread.z === this.constants.nz - 1) {
         return 0;
       }
       return velocities[this.thread.z][this.thread.y][this.thread.x];

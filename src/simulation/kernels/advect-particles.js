@@ -46,14 +46,13 @@ export const createAdvectParticlesKernel = (
         );
         let k2 = dt * vxIntermediate;
         let projectedPosition = x + k2;
-        if (projectedPosition < this.constants.CELL_SIZE) {
-          projectedPosition = 1.5 * this.constants.CELL_SIZE;
+        if (projectedPosition < 0) {
+          projectedPosition = 0;
         } else if (
           projectedPosition >
-          (this.constants.NX - 1) * this.constants.CELL_SIZE
+          this.constants.NX * this.constants.CELL_SIZE
         ) {
-          projectedPosition =
-            (this.constants.NX - 1.5) * this.constants.CELL_SIZE;
+          projectedPosition = this.constants.NX * this.constants.CELL_SIZE;
         }
         return projectedPosition;
       } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
@@ -85,14 +84,13 @@ export const createAdvectParticlesKernel = (
         );
         let k2 = dt * vyIntermediate;
         let projectedPosition = y + k2;
-        if (projectedPosition < this.constants.CELL_SIZE) {
-          projectedPosition = 1.5 * this.constants.CELL_SIZE;
+        if (projectedPosition < 0) {
+          projectedPosition = 0;
         } else if (
           projectedPosition >
-          (this.constants.NY - 1) * this.constants.CELL_SIZE
+          this.constants.NY * this.constants.CELL_SIZE
         ) {
-          projectedPosition =
-            (this.constants.NY - 1.5) * this.constants.CELL_SIZE;
+          projectedPosition = this.constants.NY * this.constants.CELL_SIZE;
         }
         return projectedPosition;
       } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
@@ -124,14 +122,13 @@ export const createAdvectParticlesKernel = (
         );
         let k2 = dt * vzIntermediate;
         let projectedPosition = z + k2;
-        if (projectedPosition < this.constants.CELL_SIZE) {
-          projectedPosition = 1.5 * this.constants.CELL_SIZE;
+        if (projectedPosition < 0) {
+          projectedPosition = 0;
         } else if (
           projectedPosition >
-          (this.constants.NZ - 1) * this.constants.CELL_SIZE
+          this.constants.NZ * this.constants.CELL_SIZE
         ) {
-          projectedPosition =
-            (this.constants.NZ - 1.5) * this.constants.CELL_SIZE;
+          projectedPosition = this.constants.NZ * this.constants.CELL_SIZE;
         }
         return projectedPosition;
       } else {
