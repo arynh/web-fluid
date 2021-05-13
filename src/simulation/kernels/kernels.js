@@ -32,6 +32,7 @@ import {
   createVelocityZUpdateKernel,
 } from "./velocity-update.js";
 import { FLUID_DENSITY } from "../simulation.js";
+import { createJacobiIterationKernel } from "./pressure-solve/jacobi-iteration.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
@@ -126,6 +127,8 @@ export const compileKernels = (gpu, particles, grid) => {
     })
     .setOutput([pcgVectorLength]);
 
+  const jacobi = createJacobiIterationKernel(gpu, ...gridSize);
+
   const pressureSolve = {
     buildADiag: buildADiag.setPipeline(true),
     buildAX: buildAX.setPipeline(true),
@@ -136,6 +139,7 @@ export const compileKernels = (gpu, particles, grid) => {
     unflatten: unflatten.setPipeline(true),
     math: math,
     zeroVector: zeroVector.setPipeline(true).setImmutable(true),
+    jacobi: jacobi.setPipeline(true).setImmutable(true),
   };
 
   // update grid velocities using the pressure gradient
@@ -185,16 +189,16 @@ export const compileKernels = (gpu, particles, grid) => {
     copyXVelocity: copyXVelocity.setPipeline(true),
     copyYVelocity: copyYVelocity.setPipeline(true),
     copyZVelocity: copyZVelocity.setPipeline(true),
-    classifyVoxels: classifyVoxels.setPipeline(true),
-    addGravity: addGravity.setPipeline(true),
-    enforceXBoundary: enforceXBoundary.setPipeline(true),
-    enforceYBoundary: enforceYBoundary.setPipeline(true),
-    enforceZBoundary: enforceZBoundary.setPipeline(true),
+    classifyVoxels: classifyVoxels.setPipeline(true).setImmutable(true),
+    addGravity: addGravity.setPipeline(true).setImmutable(true),
+    enforceXBoundary: enforceXBoundary.setPipeline(true).setImmutable(true),
+    enforceYBoundary: enforceYBoundary.setPipeline(true).setImmutable(true),
+    enforceZBoundary: enforceZBoundary.setPipeline(true).setImmutable(true),
     gridToParticles: gridToParticles,
     advectParticles: advectParticles.setPipeline(true),
     pressureSolve: pressureSolve,
-    updateVelocityX: updateVelocityX.setPipeline(true),
-    updateVelocityY: updateVelocityY.setPipeline(true),
-    updateVelocityZ: updateVelocityZ.setPipeline(true),
+    updateVelocityX: updateVelocityX.setPipeline(true).setImmutable(true),
+    updateVelocityY: updateVelocityY.setPipeline(true).setImmutable(true),
+    updateVelocityZ: updateVelocityZ.setPipeline(true).setImmutable(true),
   };
 };

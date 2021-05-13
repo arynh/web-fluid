@@ -5,7 +5,7 @@ import { compileKernels } from "./kernels/kernels.js";
 
 export const FLUID_DENSITY = 997;
 const SOLVER_TOLERANCE = 1e-4;
-const SOLVER_ITERATION_LIMIT = 100;
+const SOLVER_ITERATION_LIMIT = 200;
 
 export class Simulation {
   constructor(gpu, config) {
@@ -59,19 +59,18 @@ export class Simulation {
     this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
     // do the pressure solve with a zero divergence velocity field
-    this.grid.pressure = this.kernels.pressureSolve.unflatten(
-      solve(
-        this.kernels.pressureSolve,
-        this.grid.voxelStates,
-        dt,
-        this.grid.velocityX,
-        this.grid.velocityY,
-        this.grid.velocityZ,
-        SOLVER_TOLERANCE,
-        SOLVER_ITERATION_LIMIT
-      )
+    this.grid.pressure = solve(
+      this.kernels.pressureSolve,
+      this.grid.voxelStates,
+      dt,
+      this.grid.velocityX,
+      this.grid.velocityY,
+      this.grid.velocityZ,
+      SOLVER_TOLERANCE,
+      SOLVER_ITERATION_LIMIT,
+      this.grid.pressure,
+      this.grid.pressureOld
     );
-    // console.log(this.grid.pressure.toArray());
 
     // update the velocity fields with the new pressure gradients
     this.grid.velocityX = this.kernels.updateVelocityX(

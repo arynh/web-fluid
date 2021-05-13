@@ -367,9 +367,24 @@
     velocityY,
     velocityZ,
     tolerance,
-    iterationLimit
+    iterationLimit,
+    pressure,
+    pressureOld
   ) => {
-    const start = Date.now();
+
+    let p = pressureOld;
+
+    const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
+
+    // JACOBI ITERATION
+    for (let i = 0; i < iterationLimit; i++) {
+      p = kernels.jacobi(d, p, voxelStates);
+    }
+
+    return p;
+
+    /* PCG METHOD
+
 
     // build coefficient matrix
     const Adiag = kernels.buildADiag(voxelStates, dt);
@@ -405,6 +420,7 @@
 
     let iterationCount = 0;
     while (iterationCount++ < iterationLimit) {
+
       // z <- As
       z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
       // console.log("A:");
@@ -438,6 +454,7 @@
 
       // if the residual is sufficiently small, return early
       if (checkResidual(_r, tolerance)) {
+        const end = Date.now();
         // console.log(
         //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
         // );
@@ -462,16 +479,17 @@
 
     const _p = p.toArray();
     free([p, z, s, r]);
+
+    // console.error("Maximum iterations used in PCG solver!");
+
+    const end = Date.now();
     // console.log(
     //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
     // );
 
     return _p;
+    */
   };
-
-  const checkResidual = (r, tolerance) => error(r) <= tolerance;
-  const error = (r) => r.reduce((max, n) => Math.max(max, Math.abs(n)), -1);
-  const free = (textures) => textures.map((t) => t.delete());
 
   const createAddGravityKernel = (gpu, nx, ny, nz) =>
     gpu
@@ -1170,10 +1188,8 @@
         const i = this.thread.x;
         const j = this.thread.y;
         const k = this.thread.z;
-        const FLUID = this.constants.FLUID;
-        const SOLID = this.constants.SOLID;
 
-        if (voxelStates[k][j][i] !== FLUID) {
+        if (voxelStates[k][j][i] !== this.constants.FLUID) {
           return 0;
         }
 
@@ -1189,25 +1205,25 @@
             velocityZ[k][j][i]);
 
         // modifying RHS (divergence) to account for solid velocities
-        if (voxelStates[k][j][i - 1] === SOLID) {
+        if (voxelStates[k][j][i - 1] === this.constants.SOLID) {
           divergence -= scale * velocityX[k][j][i];
         }
-        if (voxelStates[k][j][i + 1] === SOLID) {
+        if (voxelStates[k][j][i + 1] === this.constants.SOLID) {
           divergence += scale * velocityX[k][j][i + 1];
         }
 
-        if (voxelStates[k][j - 1][i] === SOLID) {
+        if (voxelStates[k][j - 1][i] === this.constants.SOLID) {
           divergence -= scale * velocityY[k][j][i];
         }
-        if (voxelStates[k][j + 1][i] === SOLID) {
+        if (voxelStates[k][j + 1][i] === this.constants.SOLID) {
           divergence += scale * velocityY[k][j + 1][i];
         }
 
-        if (voxelStates[k - 1][j][i] === SOLID) {
+        if (voxelStates[k - 1][j][i] === this.constants.SOLID) {
           divergence -= scale * velocityZ[k][j][i];
         }
 
-        if (voxelStates[k + 1][j][i] === SOLID) {
+        if (voxelStates[k + 1][j][i] === this.constants.SOLID) {
           divergence += scale * velocityZ[k + 1][j][i];
         }
 
@@ -1395,10 +1411,15 @@
             pressure[this.thread.z][this.thread.y - 1][this.thread.x]) /
           this.constants.CELL_SIZE;
 
-        return (
-          velocity[this.thread.z][this.thread.y][this.thread.x] -
-          (dt * pressureGradient) / this.constants.FLUID_DENSITY
-        );
+        const oldVelocity = velocity[this.thread.z][this.thread.y][this.thread.x];
+        const newVelocity =
+          oldVelocity - (dt * pressureGradient) / this.constants.FLUID_DENSITY;
+
+        // if (newVelocity > 0) {
+        //   debugger;
+        // }
+
+        return newVelocity;
       })
       .setConstants({
         FLUID_DENSITY: fluidDensity,
@@ -1451,6 +1472,65 @@
         NY: ny,
         NZ: nz,
         FLUID: STATE_ENUM.FLUID,
+      })
+      .setOutput([nx, ny, nz]);
+
+  const createJacobiIterationKernel = (gpu, nx, ny, nz) =>
+    gpu
+      .createKernel(function (negativeDivergence, pressure, voxelStates) {
+        const i = this.thread.x;
+        const j = this.thread.y;
+        const k = this.thread.z;
+
+        if (voxelStates[k][j][i] === this.constants.AIR) {
+          return 0;
+        } else if (voxelStates[k][j][i] === this.constants.SOLID) {
+          return 100000;
+        }
+
+        const divergenceCenter = negativeDivergence[k][j][i];
+
+        let left = 0.0;
+        let right = 0.0;
+        let bottom = 0.0;
+        let top = 0.0;
+        let back = 0.0;
+        let front = 0.0;
+
+        // negative x neighbor
+        if (voxelStates[k][j][i - 1] === this.constants.FLUID) {
+          left = pressure[k][j][i - 1];
+        }
+        // positive x neighbor
+        if (voxelStates[k][j][i + 1] === this.constants.FLUID) {
+          right = pressure[k][j][i + 1];
+        }
+        // negative y neighbor
+        if (voxelStates[k][j - 1][i] === this.constants.FLUID) {
+          bottom = pressure[k][j - 1][i];
+        }
+        // positive y neighbor
+        if (voxelStates[k][j + 1][i] === this.constants.FLUID) {
+          top = pressure[k][j + 1][i];
+        }
+        // negative z neighbor
+        if (voxelStates[k - 1][j][i] === this.constants.FLUID) {
+          front = pressure[k - 1][j][i];
+        }
+        // positive z neighbor
+        if (voxelStates[k + 1][j][i] === this.constants.FLUID) {
+          back = pressure[k + 1][j][i];
+        }
+
+        return (
+          (left + right + bottom + top + back + front + divergenceCenter) / 6.0
+        );
+      })
+      .setTactic("precision") // vector math should be high precision
+      .setConstants({
+        FLUID: STATE_ENUM.FLUID,
+        AIR: STATE_ENUM.AIR,
+        SOLID: STATE_ENUM.SOLID,
       })
       .setOutput([nx, ny, nz]);
 
@@ -1547,6 +1627,8 @@
       })
       .setOutput([pcgVectorLength]);
 
+    const jacobi = createJacobiIterationKernel(gpu, ...gridSize);
+
     const pressureSolve = {
       buildADiag: buildADiag.setPipeline(true),
       buildAX: buildAX.setPipeline(true),
@@ -1557,6 +1639,7 @@
       unflatten: unflatten.setPipeline(true),
       math: math,
       zeroVector: zeroVector.setPipeline(true).setImmutable(true),
+      jacobi: jacobi.setPipeline(true).setImmutable(true),
     };
 
     // update grid velocities using the pressure gradient
@@ -1606,23 +1689,23 @@
       copyXVelocity: copyXVelocity.setPipeline(true),
       copyYVelocity: copyYVelocity.setPipeline(true),
       copyZVelocity: copyZVelocity.setPipeline(true),
-      classifyVoxels: classifyVoxels.setPipeline(true),
-      addGravity: addGravity.setPipeline(true),
-      enforceXBoundary: enforceXBoundary.setPipeline(true),
-      enforceYBoundary: enforceYBoundary.setPipeline(true),
-      enforceZBoundary: enforceZBoundary.setPipeline(true),
+      classifyVoxels: classifyVoxels.setPipeline(true).setImmutable(true),
+      addGravity: addGravity.setPipeline(true).setImmutable(true),
+      enforceXBoundary: enforceXBoundary.setPipeline(true).setImmutable(true),
+      enforceYBoundary: enforceYBoundary.setPipeline(true).setImmutable(true),
+      enforceZBoundary: enforceZBoundary.setPipeline(true).setImmutable(true),
       gridToParticles: gridToParticles,
       advectParticles: advectParticles.setPipeline(true),
       pressureSolve: pressureSolve,
-      updateVelocityX: updateVelocityX.setPipeline(true),
-      updateVelocityY: updateVelocityY.setPipeline(true),
-      updateVelocityZ: updateVelocityZ.setPipeline(true),
+      updateVelocityX: updateVelocityX.setPipeline(true).setImmutable(true),
+      updateVelocityY: updateVelocityY.setPipeline(true).setImmutable(true),
+      updateVelocityZ: updateVelocityZ.setPipeline(true).setImmutable(true),
     };
   };
 
   const FLUID_DENSITY = 997;
   const SOLVER_TOLERANCE = 1e-4;
-  const SOLVER_ITERATION_LIMIT = 100;
+  const SOLVER_ITERATION_LIMIT = 200;
 
   class Simulation {
     constructor(gpu, config) {
@@ -1676,19 +1759,18 @@
       this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
       // do the pressure solve with a zero divergence velocity field
-      this.grid.pressure = this.kernels.pressureSolve.unflatten(
-        solve(
-          this.kernels.pressureSolve,
-          this.grid.voxelStates,
-          dt,
-          this.grid.velocityX,
-          this.grid.velocityY,
-          this.grid.velocityZ,
-          SOLVER_TOLERANCE,
-          SOLVER_ITERATION_LIMIT
-        )
+      this.grid.pressure = solve(
+        this.kernels.pressureSolve,
+        this.grid.voxelStates,
+        dt,
+        this.grid.velocityX,
+        this.grid.velocityY,
+        this.grid.velocityZ,
+        SOLVER_TOLERANCE,
+        SOLVER_ITERATION_LIMIT,
+        this.grid.pressure,
+        this.grid.pressureOld
       );
-      // console.log(this.grid.pressure.toArray());
 
       // update the velocity fields with the new pressure gradients
       this.grid.velocityX = this.kernels.updateVelocityX(
@@ -1805,6 +1887,7 @@
     var startTime = Date.now() / 1000;
     var lastTime = startTime;
 
+    // const gpu = new GPU({ mode: "cpu" });
     const gpu = new GPU();
     const sim = new Simulation(gpu, {
       particleDensity: density,
@@ -1911,7 +1994,7 @@
       let localTime = Date.now() / 1000 - startTime;
 
       // step the simulation forwards
-      deltaTime = Math.min(deltaTime, 1 / 200);
+      deltaTime = Math.min(deltaTime, 1 / 60);
       if (localTime < 150) {
         sim.step(deltaTime);
       }

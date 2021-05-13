@@ -6,9 +6,25 @@ export const solve = (
   velocityY,
   velocityZ,
   tolerance,
-  iterationLimit
+  iterationLimit,
+  pressure,
+  pressureOld
 ) => {
   const start = Date.now();
+
+  let p = pressureOld;
+
+  const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
+
+  // JACOBI ITERATION
+  for (let i = 0; i < iterationLimit; i++) {
+    p = kernels.jacobi(d, p, voxelStates);
+  }
+
+  return p;
+
+  /* PCG METHOD
+
 
   // build coefficient matrix
   const Adiag = kernels.buildADiag(voxelStates, dt);
@@ -44,6 +60,7 @@ export const solve = (
 
   let iterationCount = 0;
   while (iterationCount++ < iterationLimit) {
+
     // z <- As
     z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
     // console.log("A:");
@@ -111,6 +128,7 @@ export const solve = (
   // );
 
   return _p;
+  */
 };
 
 const checkResidual = (r, tolerance) => error(r) <= tolerance;

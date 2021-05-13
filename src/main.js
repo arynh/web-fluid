@@ -68,6 +68,7 @@ function RayMarchingEffect(resolution, density) {
   var startTime = Date.now() / 1000;
   var lastTime = startTime;
 
+  // const gpu = new GPU({ mode: "cpu" });
   const gpu = new GPU();
   const sim = new Simulation(gpu, {
     particleDensity: density,
@@ -174,7 +175,7 @@ function RayMarchingEffect(resolution, density) {
     let localTime = Date.now() / 1000 - startTime;
 
     // step the simulation forwards
-    deltaTime = Math.min(deltaTime, 1 / 200);
+    deltaTime = Math.min(deltaTime, 1 / 60);
     if (localTime < 150) {
       sim.step(deltaTime);
     }

@@ -73,10 +73,15 @@ export const createVelocityYUpdateKernel = (
           pressure[this.thread.z][this.thread.y - 1][this.thread.x]) /
         this.constants.CELL_SIZE;
 
-      return (
-        velocity[this.thread.z][this.thread.y][this.thread.x] -
-        (dt * pressureGradient) / this.constants.FLUID_DENSITY
-      );
+      const oldVelocity = velocity[this.thread.z][this.thread.y][this.thread.x];
+      const newVelocity =
+        oldVelocity - (dt * pressureGradient) / this.constants.FLUID_DENSITY;
+
+      // if (newVelocity > 0) {
+      //   debugger;
+      // }
+
+      return newVelocity;
     })
     .setConstants({
       FLUID_DENSITY: fluidDensity,
