@@ -223,7 +223,7 @@
         gui.add(densitySlider, 'value', 1, 40000).name("Particle Density");
         var updateFunc = {
           update: function () {
-            singleEffect = new RayMarchingEffect(40, densitySlider.value);
+            singleEffect = new RayMarchingEffect(40, densitySlider.value, window.fakeWater);
           }
         };
         
@@ -233,8 +233,13 @@
         window.smoothSlider = { value: 0.66 };
         gui.add(window.smoothSlider, 'value', 0, 1).name("Smoothing");
 
+        window.fakeWater = false;
+        gui.add(window, 'fakeWater').name("Fake Water").onChange(function (value) {
+          updateFunc.update();
+        }); 
+
         gui.add(updateFunc, 'update').name("Restart Simulation");
-        singleEffect = new RayMarchingEffect(40, densitySlider.value);
+        updateFunc.update();
         mainloop()
       }
     }

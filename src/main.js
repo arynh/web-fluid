@@ -32,7 +32,7 @@
 import { vec3 } from "gl-matrix";
 import { Simulation } from "./simulation/simulation.js";
 
-function RayMarchingEffect(resolution, density) {
+function RayMarchingEffect(resolution, density, fakeWater) {
   var ext = gl.getExtension("OES_texture_float");
   if (!ext) {
     alert("this machine or browser does not support OES_texture_float");
@@ -175,7 +175,9 @@ function RayMarchingEffect(resolution, density) {
 
     // step the simulation forwards
     deltaTime = Math.min(deltaTime, 1 / 60);
-    sim.step(deltaTime / 2);
+    if (!fakeWater) {
+      sim.step(deltaTime / 2);
+    }
 
     var uniformsConst = {
       u_field: textures[0],
@@ -186,34 +188,31 @@ function RayMarchingEffect(resolution, density) {
 
     if (firstDraw) {
       // Set firstDraw = false to only draw 1 frame
-
-      // Sine wave water
-      /*
       let balls = [];
-      let n = 30;
-      let radius = 0.04;
-      
-      for (let x = 0; x < n; ++x) {
-        for (let z = 0; z < n; ++z) {
-          let xp = (x+0.5) / n;
-          let zp = (z+0.5) / n;
-          let r = Math.sqrt((xp-0.5) * (xp-0.5) + (zp-0.5) * (zp-0.5));
-          //let y = 0.1*((Math.sin(40 * r - 1.5*time) + 1) / 2) / Math.abs(10*(Math.max(r, 0.013))) + 0.05;
-          let y = 0.3 * Math.pow(Math.cos(10 * r - 1 * time), 2) / Math.max(10*r, 0.5) + 0.05;
-          balls.push([xp, y, zp]);
-        }
-      }
-      */
-
-      let balls = [];
-      //let radius = 0.04;
       let radius = window.radiusSlider.value / 100;
-      for (let i = 0; i < sim.particles.particleBuffer.length; i += 6) {
-        balls.push([
-          sim.particles.particleBuffer[i],
-          sim.particles.particleBuffer[i + 1],
-          sim.particles.particleBuffer[i + 2],
-        ]);
+
+      if (fakeWater) {
+        // Sine wave water
+        let n = 30;
+        
+        for (let x = 0; x < n; ++x) {
+          for (let z = 0; z < n; ++z) {
+            let xp = (x+0.5) / n;
+            let zp = (z+0.5) / n;
+            let r = Math.sqrt((xp-0.5) * (xp-0.5) + (zp-0.5) * (zp-0.5));
+            //let y = 0.1*((Math.sin(40 * r - 1.5*time) + 1) / 2) / Math.abs(10*(Math.max(r, 0.013))) + 0.05;
+            let y = 0.3 * Math.pow(Math.cos(10 * r - 1 * curTime), 2) / Math.max(10*r, 0.5) + 0.05;
+            balls.push([xp, y, zp]);
+          }
+        }
+      } else {
+        for (let i = 0; i < sim.particles.particleBuffer.length; i += 6) {
+          balls.push([
+            sim.particles.particleBuffer[i],
+            sim.particles.particleBuffer[i + 1],
+            sim.particles.particleBuffer[i + 2],
+          ]);
+        }
       }
 
       // Swap comment to see with / without smoothing
