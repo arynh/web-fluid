@@ -1041,6 +1041,9 @@
             velocityZ[k + 1][j][i] -
             velocityZ[k][j][i]);
 
+        /* TODO: experiment with these boundary conditions to see if we can
+            lose less energy
+
         // modifying RHS (divergence) to account for solid velocities
         if (voxelStates[k][j][i - 1] === this.constants.SOLID) {
           divergence -= scale * velocityX[k][j][i];
@@ -1063,6 +1066,7 @@
         if (voxelStates[k + 1][j][i] === this.constants.SOLID) {
           divergence += scale * velocityZ[k + 1][j][i];
         }
+        */
 
         return divergence;
       })
@@ -1557,9 +1561,6 @@
     step(dt) {
       let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
 
-      // console.log("first particle y velocity:");
-      // console.log(particleBufferCopy[4]);
-
       // transfer particle velocities to the grid and interpolate
       this.grid.velocityX = this.kernels.particleToXGrid(
         particleBufferCopy,
@@ -1574,8 +1575,6 @@
         this.grid.cellSize
       );
 
-      // console.log("before copy:");
-      // console.log(this.grid.velocityY.toArray()[2][2][2]);
       // copy grid values to store the old ones
       this.grid.pressureOld = this.kernels.copyPressure(this.grid.pressure);
       this.grid.velocityXOld = this.kernels.copyXVelocity(this.grid.velocityX);
@@ -1589,21 +1588,16 @@
         this.grid.cellSize
       );
 
-      // console.log("before gravity update:");
-      // console.log(this.grid.velocityY.toArray()[2][2][2]);
-
       // perform gravity update
       this.grid.velocityY = this.kernels.addGravity(
         this.grid.velocityY,
         dt,
         this.grid.voxelStates
       );
-      // console.log("after:");
-      // console.log(this.grid.velocityY.toArray()[2][2][2]);
 
       // enforce boundary conditions
       this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
-      // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
+      this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
       this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
       // do the pressure solve with a zero divergence velocity field
@@ -1619,8 +1613,6 @@
         this.grid.pressure,
         this.grid.pressureOld
       );
-      // // console.log("pressure:");
-      // // console.log(this.grid.pressure); //.toArray());
 
       // update the velocity fields with the new pressure gradients
       this.grid.velocityX = this.kernels.updateVelocityX(
@@ -1629,16 +1621,12 @@
         this.grid.voxelStates,
         dt
       );
-      // // console.log("old y velocity:");
-      // // console.log(this.grid.velocityY); //.toArray());
       this.grid.velocityY = this.kernels.updateVelocityY(
         this.grid.velocityY,
         this.grid.pressure,
         this.grid.voxelStates,
         dt
       );
-      // // console.log("new y velocity:");
-      // // console.log(this.grid.velocityY); //.toArray());
       this.grid.velocityZ = this.kernels.updateVelocityZ(
         this.grid.velocityZ,
         this.grid.pressure,
@@ -1663,8 +1651,6 @@
           particleBufferCopy
         )
         .toArray();
-
-      // console.log(this.particles.get(566).y_velocity);
 
       // advect the particles to find their new positions
       this.particles.particleBuffer = this.kernels
