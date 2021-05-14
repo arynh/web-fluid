@@ -1,8 +1,10 @@
 import { MACGrid } from "./mac-grid.js";
 import { Particles } from "./particles.js";
+import { solve } from "./pressure-solve.js";
 import { compileKernels } from "./kernels/kernels.js";
 
-export const FLUID_DENSITY = 997;
+export const FLUID_DENSITY = 3.75;
+const SOLVER_ITERATION_LIMIT = 50;
 
 export class Simulation {
   constructor(gpu, config) {
@@ -10,16 +12,13 @@ export class Simulation {
       config.particleDensity,
       config.particleBounds
     );
-    this.grid = new MACGrid(
-      config.gridBounds,
-      2.0 / Math.cbrt(config.particleDensity)
-    );
-    this.grid.addDefaultSolids();
+    this.grid = new MACGrid(config.gridBounds, 0.025);
     this.kernels = compileKernels(gpu, this.particles, this.grid);
   }
 
   step(dt) {
     let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
+
     // transfer particle velocities to the grid and interpolate
     this.grid.velocityX = this.kernels.particleToXGrid(
       particleBufferCopy,
@@ -48,20 +47,52 @@ export class Simulation {
     );
 
     // perform gravity update
-    this.grid.velocityY = this.kernels.addGravity(this.grid.velocityY, dt);
+    this.grid.velocityY = this.kernels.addGravity(
+      this.grid.velocityY,
+      dt,
+      this.grid.voxelStates
+    );
 
     // enforce boundary conditions
-    //this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
+    this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
     this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
-    //this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
+    this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
     // do the pressure solve with a zero divergence velocity field
-    // TODO: implement this!
+    this.grid.pressure = solve(
+      this.kernels.pressureSolve,
+      this.grid.voxelStates,
+      this.grid.velocityX,
+      this.grid.velocityY,
+      this.grid.velocityZ,
+      SOLVER_ITERATION_LIMIT,
+      this.grid.pressureOld
+    );
+
+    // update the velocity fields with the new pressure gradients
+    this.grid.velocityX = this.kernels.updateVelocityX(
+      this.grid.velocityX,
+      this.grid.pressure,
+      this.grid.voxelStates,
+      dt
+    );
+    this.grid.velocityY = this.kernels.updateVelocityY(
+      this.grid.velocityY,
+      this.grid.pressure,
+      this.grid.voxelStates,
+      dt
+    );
+    this.grid.velocityZ = this.kernels.updateVelocityZ(
+      this.grid.velocityZ,
+      this.grid.pressure,
+      this.grid.voxelStates,
+      dt
+    );
 
     // enforce boundary conditions
-    // this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
-    // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
-    // this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
+    this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
+    this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
+    this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
     // update the velocities of the particles
     this.particles.particleBuffer = this.kernels
@@ -75,6 +106,7 @@ export class Simulation {
         particleBufferCopy
       )
       .toArray();
+
     // advect the particles to find their new positions
     this.particles.particleBuffer = this.kernels
       .advectParticles(

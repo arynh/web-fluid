@@ -9,20 +9,14 @@ import {
 } from "./enforce-boundary-conditions.js";
 import { createParticleToGridKernel } from "./transfer-particle-to-grid.js";
 import { createGridToParticlesKernel } from "./transfer-grid-to-particles.js";
-import {
-  createApplyAKernel,
-  createComponentWiseAddKernel,
-  createComponentWiseMultiplyKernel,
-  createScalarMultiplyKernel,
-} from "./pressure-solve/vector-math.js";
-import {
-  createADiagKernel,
-  createAXKernel,
-  createAYKernel,
-  createAZKernel,
-} from "./pressure-solve/build-coefficient-matrix.js";
 import { createNegativeDivergenceKernel } from "./pressure-solve/negative-divergence.js";
-import { createFlattenKernel } from "./pressure-solve/flatten.js";
+import {
+  createVelocityXUpdateKernel,
+  createVelocityYUpdateKernel,
+  createVelocityZUpdateKernel,
+} from "./velocity-update.js";
+import { FLUID_DENSITY } from "../simulation.js";
+import { createJacobiIterationKernel } from "./pressure-solve/jacobi-iteration.js";
 
 export const compileKernels = (gpu, particles, grid) => {
   const start = Date.now();
@@ -76,56 +70,39 @@ export const compileKernels = (gpu, particles, grid) => {
 
   // do pressure solve
 
-  // build coefficient matrix
-  const buildADiag = createADiagKernel(gpu, ...gridSize, grid.cellSize);
-  const buildAX = createAXKernel(gpu, ...gridSize, grid.cellSize);
-  const buildAY = createAYKernel(gpu, ...gridSize, grid.cellSize);
-  const buildAZ = createAZKernel(gpu, ...gridSize, grid.cellSize);
-
   // build negative divergence vector with boundary conditions
   const buildD = createNegativeDivergenceKernel(
     gpu,
     ...gridSize,
     grid.cellSize
   );
-  const flatten = createFlattenKernel(gpu, ...gridSize);
 
-  // compile kernels to do vector operations
-  const pcgVectorLength = grid.nx * grid.ny * grid.nz;
-  const componentWiseAdd = createComponentWiseAddKernel(gpu, pcgVectorLength);
-  const componentWiseMultiply = createComponentWiseMultiplyKernel(
-    gpu,
-    pcgVectorLength
-  );
-  // implement dot product's sum portion on the CPU
-  const dot = (a, b) =>
-    componentWiseMultiply(a, b).reduce((sum, n) => sum + n, 0);
-  const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
-  const applyA = createApplyAKernel(gpu, pcgVectorLength);
-  const math = {
-    componentWiseAdd: componentWiseAdd.setPipeline(true),
-    dot: dot,
-    scalarMultiply: scalarMultiply.setPipeline(true),
-    applyA: applyA.setPipeline(true),
-  };
-
-  // PCG methods
-  const zeroVector = gpu
-    .createKernel(function () {
-      return 0;
-    })
-    .setOutput([pcgVectorLength]);
+  const jacobi = createJacobiIterationKernel(gpu, ...gridSize);
 
   const pressureSolve = {
-    buildADiag: buildADiag.setPipeline(true),
-    buildAX: buildAX.setPipeline(true),
-    buildAY: buildAY.setPipeline(true),
-    buildAZ: buildAZ.setPipeline(true),
-    buildD: buildD.setPipeline(true),
-    flatten: flatten.setPipeline(true),
-    math: math,
-    zeroVector: zeroVector.setPipeline(true),
+    buildD: buildD.setPipeline(true).setImmutable(true),
+    jacobi: jacobi.setPipeline(true).setImmutable(true),
   };
+
+  // update grid velocities using the pressure gradient
+  const updateVelocityX = createVelocityXUpdateKernel(
+    gpu,
+    ...velocityXSize,
+    FLUID_DENSITY,
+    grid.cellSize
+  );
+  const updateVelocityY = createVelocityYUpdateKernel(
+    gpu,
+    ...velocityYSize,
+    FLUID_DENSITY,
+    grid.cellSize
+  );
+  const updateVelocityZ = createVelocityZUpdateKernel(
+    gpu,
+    ...velocityZSize,
+    FLUID_DENSITY,
+    grid.cellSize
+  );
 
   // update the velocities of the particles using PIC/FLIP
   const gridToParticles = createGridToParticlesKernel(
@@ -147,20 +124,23 @@ export const compileKernels = (gpu, particles, grid) => {
   console.log(`Kernels compiled in ${end - start} ms.`);
 
   return {
-    particleToXGrid: particleToXGrid.setPipeline(true),
-    particleToYGrid: particleToYGrid.setPipeline(true),
-    particleToZGrid: particleToZGrid.setPipeline(true),
-    copyPressure: copyPressure.setPipeline(true),
-    copyXVelocity: copyXVelocity.setPipeline(true),
-    copyYVelocity: copyYVelocity.setPipeline(true),
-    copyZVelocity: copyZVelocity.setPipeline(true),
-    classifyVoxels: classifyVoxels.setPipeline(true),
-    addGravity: addGravity.setPipeline(true),
-    enforceXBoundary: enforceXBoundary.setPipeline(true),
-    enforceYBoundary: enforceYBoundary.setPipeline(true),
-    enforceZBoundary: enforceZBoundary.setPipeline(true),
+    particleToXGrid: particleToXGrid.setPipeline(true).setImmutable(true),
+    particleToYGrid: particleToYGrid.setPipeline(true).setImmutable(true),
+    particleToZGrid: particleToZGrid.setPipeline(true).setImmutable(true),
+    copyPressure: copyPressure.setPipeline(true).setImmutable(true),
+    copyXVelocity: copyXVelocity.setPipeline(true).setImmutable(true),
+    copyYVelocity: copyYVelocity.setPipeline(true).setImmutable(true),
+    copyZVelocity: copyZVelocity.setPipeline(true).setImmutable(true),
+    classifyVoxels: classifyVoxels.setPipeline(true).setImmutable(true),
+    addGravity: addGravity.setPipeline(true).setImmutable(true),
+    enforceXBoundary: enforceXBoundary.setPipeline(true).setImmutable(true),
+    enforceYBoundary: enforceYBoundary.setPipeline(true).setImmutable(true),
+    enforceZBoundary: enforceZBoundary.setPipeline(true).setImmutable(true),
     gridToParticles: gridToParticles,
-    advectParticles: advectParticles.setPipeline(true),
+    advectParticles: advectParticles.setPipeline(true).setImmutable(true),
     pressureSolve: pressureSolve,
+    updateVelocityX: updateVelocityX.setPipeline(true).setImmutable(true),
+    updateVelocityY: updateVelocityY.setPipeline(true).setImmutable(true),
+    updateVelocityZ: updateVelocityZ.setPipeline(true).setImmutable(true),
   };
 };

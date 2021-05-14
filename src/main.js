@@ -72,11 +72,11 @@ function RayMarchingEffect(resolution, density) {
   const sim = new Simulation(gpu, {
     particleDensity: density,
     particleBounds: {
-      min: vec3.fromValues(0.3, 0.3, 0.3),
-      max: vec3.fromValues(0.7, 0.7, 0.7),
+      min: vec3.fromValues(0.15, 0.15, 0.15),
+      max: vec3.fromValues(0.8, 0.75, 0.35),
     },
     gridBounds: {
-      min: vec3.fromValues(0.1, 0.1, 0.1),
+      min: vec3.fromValues(0.1, 0.0, 0.1),
       max: vec3.fromValues(0.9, 0.9, 0.9),
     },
   });
@@ -106,8 +106,8 @@ function RayMarchingEffect(resolution, density) {
       return (
         Math.sqrt(
           (x_w - balls[closest][0]) * (x_w - balls[closest][0]) +
-          (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
-          (z_w - balls[closest][2]) * (z_w - balls[closest][2])
+            (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
+            (z_w - balls[closest][2]) * (z_w - balls[closest][2])
         ) - radius
       );
     })
@@ -134,7 +134,7 @@ function RayMarchingEffect(resolution, density) {
             // Weighted by e^(-r^2 / c)
             let w = Math.pow(
               2.71,
-              -1 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o) / coefficient
+              (-1 * Math.sqrt(x_o * x_o + y_o * y_o + z_o * z_o)) / coefficient
             );
 
             if (
@@ -173,12 +173,9 @@ function RayMarchingEffect(resolution, density) {
 
     let localTime = Date.now() / 1000 - startTime;
 
-    if (deltaTime > 1 / 20) {
-      deltaTime = 1 / 20;
-    }
-
     // step the simulation forwards
-    sim.step(deltaTime);
+    deltaTime = Math.min(deltaTime, 1 / 60);
+    sim.step(deltaTime / 2);
 
     var uniformsConst = {
       u_field: textures[0],

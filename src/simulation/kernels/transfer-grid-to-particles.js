@@ -14,7 +14,15 @@ const createGridVelocityDifferenceKernel = (gpu, nx, ny, nz) =>
 // FLIP Kernel
 const createFLIPKernel = (gpu, particleCount, cellSize) =>
   gpu
-    .createKernel(function (particles, diffGridVx, diffGridVy, diffGridVz) {
+    .createKernel(function (
+      particles,
+      diffGridVx,
+      diffGridVy,
+      diffGridVz,
+      oldVx,
+      oldVy,
+      oldVz
+    ) {
       // mod to figure out which index we are at (0-5) for each particle
       let index_mod = this.thread.x % this.constants.ATTRIBUTE_COUNT;
       // if we are looking at the position just return the position
@@ -32,6 +40,7 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
       let grid_upper_y = Math.ceil(pos_y / this.constants.CELL_SIZE);
       let grid_lower_z = Math.floor(pos_z / this.constants.CELL_SIZE);
       let grid_upper_z = Math.ceil(pos_z / this.constants.CELL_SIZE);
+      let alpha = 0.95;
       if (index_mod === 3) {
         // vx
         // get the lerp weight and return the lerp'd velocity
@@ -39,10 +48,22 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
           (pos_x - grid_lower_x * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         return lerp(
-          diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x],
-          diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x],
+        lerp(
+          diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x]+oldVx[grid_lower_z][grid_lower_y][grid_lower_x],
+          diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x]+oldVx[grid_lower_z][grid_lower_y][grid_upper_x],
           lerpWeight
-        );
+        ),(
+          lerp(
+            oldVx[grid_lower_z][grid_lower_y][grid_lower_x],
+            oldVx[grid_lower_z][grid_lower_y][grid_upper_x],
+            lerpWeight
+          ) +
+          lerp(
+            diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x],
+            diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x],
+            lerpWeight
+          )
+        ),alpha);
       } else if (index_mod === 4) {
         // vy
         // get the lerp weight and return the lerp'd velocity
@@ -50,10 +71,22 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
           (pos_y - grid_lower_y * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         return lerp(
-          diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x],
-          diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x],
-          lerpWeight
-        );
+          lerp(
+            diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x]+oldVy[grid_lower_z][grid_lower_y][grid_lower_x],
+            diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x]+oldVy[grid_lower_z][grid_upper_y][grid_lower_x],
+            lerpWeight)
+          ,
+          (lerp(
+            oldVy[grid_lower_z][grid_lower_y][grid_lower_x],
+            oldVy[grid_lower_z][grid_upper_y][grid_lower_x],
+            lerpWeight
+          ) +
+          lerp(
+            diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x],
+            diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x],
+            lerpWeight
+          )
+        ),alpha);
       } else if (index_mod === 5) {
         // vz
         // get the lerp weight and return the lerp'd velocity
@@ -61,10 +94,22 @@ const createFLIPKernel = (gpu, particleCount, cellSize) =>
           (pos_z - grid_lower_z * this.constants.CELL_SIZE) /
           this.constants.CELL_SIZE;
         return lerp(
-          diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x],
-          diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x],
-          lerpWeight
-        );
+          lerp(
+            diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x]+oldVz[grid_lower_z][grid_lower_y][grid_lower_x],
+            diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x]+oldVz[grid_upper_z][grid_lower_y][grid_lower_x],
+            lerpWeight)
+          ,(
+          lerp(
+            oldVz[grid_lower_z][grid_lower_y][grid_lower_x],
+            oldVz[grid_upper_z][grid_lower_y][grid_lower_x],
+            lerpWeight
+          ) +
+          lerp(
+            diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x],
+            diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x],
+            lerpWeight
+          )
+        ),alpha);
       }
     })
     .addFunction(function lerp(a, b, t) {
@@ -119,6 +164,9 @@ export const createGridToParticlesKernel = (
       particles,
       velocityXDifference(oldXVelocity, newXVelocity),
       velocityYDifference(oldYVelocity, newYVelocity),
-      velocityZDifference(oldZVelocity, newZVelocity)
+      velocityZDifference(oldZVelocity, newZVelocity),
+      oldXVelocity,
+      oldYVelocity,
+      oldZVelocity
     );
 };
