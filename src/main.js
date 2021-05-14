@@ -29,7 +29,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { vec3 } from "gl-matrix";
+import { vec3, quat } from "gl-matrix";
 import { Simulation } from "./simulation/simulation.js";
 
 function RayMarchingEffect(resolution, density, fakeWater) {
@@ -67,6 +67,20 @@ function RayMarchingEffect(resolution, density, fakeWater) {
   var firstDraw = true;
   var startTime = Date.now() / 1000;
   var lastTime = startTime;
+
+  var currentlyPressedKeys = {};
+  var eyePt = vec3.fromValues(0.5, 1.2, 2);
+  var viewDir = vec3.fromValues(0.0, -0.9, -1.5);
+  /** @global Rotation around up */
+  var upRot = quat.create();
+  /** @global Rotation around right */
+  var rightRot = quat.create();
+  /** @global Final change in rotation */
+  var finalRot = quat.create();
+  /** @global Direction of up in world coordinates */
+  var upDir = vec3.fromValues(0.0, 1.0, 0.0);
+  /** @global Direction of right in world coordinates */
+  var rightDir = vec3.fromValues(1.0, 0.0, 0.0);
 
   const gpu = new GPU();
   const sim = new Simulation(gpu, {
@@ -106,8 +120,8 @@ function RayMarchingEffect(resolution, density, fakeWater) {
       return (
         Math.sqrt(
           (x_w - balls[closest][0]) * (x_w - balls[closest][0]) +
-            (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
-            (z_w - balls[closest][2]) * (z_w - balls[closest][2])
+          (y_w - balls[closest][1]) * (y_w - balls[closest][1]) +
+          (z_w - balls[closest][2]) * (z_w - balls[closest][2])
         ) - radius
       );
     })
@@ -160,6 +174,71 @@ function RayMarchingEffect(resolution, density, fakeWater) {
     .setPipeline(true)
     .setOutput([max_tex_dim * 4]);
 
+  // Key down watcher
+  this.handleKeyDown = function (event) {
+    var k = event.key.toLowerCase();
+    currentlyPressedKeys[k] = true;
+    if (k == "arrowup" || k == "arrowleft" || k == "arrowright" || k == "arrowdown") {
+      event.preventDefault();
+    }
+  }
+
+  // Key up watcher
+  this.handleKeyUp = function (event) {
+    currentlyPressedKeys[event.key.toLowerCase()] = false;
+  }
+
+  // Free camera movement
+  this.freecamMovement = function (deltaTime) {
+    // Rotation speeds
+    var rotDegPerSec = 120;
+    var rotRadPerSec = rotDegPerSec * 3.14159 / 180;
+    var viewDirScaled = vec3.fromValues(0.0, 0.0, 0.0);
+    var rightDirScaled = vec3.fromValues(0.0, 0.0, 0.0);
+    vec3.scale(viewDirScaled, viewDir, 2 * deltaTime);
+    vec3.scale(rightDirScaled, rightDir, 2 * deltaTime);
+
+    // Move eye relative to forward
+    if (currentlyPressedKeys["w"]) {
+      vec3.add(eyePt, eyePt, viewDirScaled);
+    }
+    if (currentlyPressedKeys["s"]) {
+      vec3.sub(eyePt, eyePt, viewDirScaled);
+    }
+    if (currentlyPressedKeys["a"]) {
+      vec3.sub(eyePt, eyePt, rightDirScaled);
+    }
+    if (currentlyPressedKeys["d"]) {
+      vec3.add(eyePt, eyePt, rightDirScaled);
+    }
+
+    // Rotate eye freely
+    var upAmt = 0;
+    var rightAmt = 0;
+    if (currentlyPressedKeys["arrowleft"]) {
+      upAmt += rotRadPerSec * deltaTime;
+    }
+    if (currentlyPressedKeys["arrowright"]) {
+      upAmt -= rotRadPerSec * deltaTime;
+    }
+    if (currentlyPressedKeys["arrowup"]) {
+      rightAmt += rotRadPerSec * deltaTime;
+    }
+    if (currentlyPressedKeys["arrowdown"]) {
+      rightAmt -= rotRadPerSec * deltaTime;
+    }
+
+    // Quaternion rotation for eye
+    quat.setAxisAngle(upRot, [0, 1, 0], upAmt);
+    quat.setAxisAngle(rightRot, rightDir, rightAmt);
+    quat.identity(finalRot);
+    quat.mul(finalRot, upRot, finalRot);
+    quat.mul(finalRot, rightRot, finalRot);
+    vec3.transformQuat(viewDir, viewDir, finalRot);
+    vec3.transformQuat(upDir, upDir, finalRot);
+    vec3.transformQuat(rightDir, rightDir, finalRot);
+  }
+
   this.render = function () {
     gl.clearColor(0.0, 0.0, 0.0, 1);
     gl.clearDepth(1.0);
@@ -182,7 +261,12 @@ function RayMarchingEffect(resolution, density, fakeWater) {
     var uniformsConst = {
       u_field: textures[0],
       time: localTime,
+      eye: eyePt,
+      forward: viewDir,
+      automatic: !window.useCamera
     };
+
+    this.freecamMovement(deltaTime);
 
     model.drawPrep(uniformsConst);
 
@@ -194,14 +278,14 @@ function RayMarchingEffect(resolution, density, fakeWater) {
       if (fakeWater) {
         // Sine wave water
         let n = 30;
-        
+
         for (let x = 0; x < n; ++x) {
           for (let z = 0; z < n; ++z) {
-            let xp = (x+0.5) / n;
-            let zp = (z+0.5) / n;
-            let r = Math.sqrt((xp-0.5) * (xp-0.5) + (zp-0.5) * (zp-0.5));
+            let xp = (x + 0.5) / n;
+            let zp = (z + 0.5) / n;
+            let r = Math.sqrt((xp - 0.5) * (xp - 0.5) + (zp - 0.5) * (zp - 0.5));
             //let y = 0.1*((Math.sin(40 * r - 1.5*time) + 1) / 2) / Math.abs(10*(Math.max(r, 0.013))) + 0.05;
-            let y = 0.3 * Math.pow(Math.cos(10 * r - 1 * curTime), 2) / Math.max(10*r, 0.5) + 0.05;
+            let y = 0.3 * Math.pow(Math.cos(10 * r - 1 * curTime), 2) / Math.max(10 * r, 0.5) + 0.05;
             balls.push([xp, y, zp]);
           }
         }
