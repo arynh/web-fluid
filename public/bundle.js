@@ -681,13 +681,19 @@
         let grid_upper_y = Math.ceil(pos_y / this.constants.CELL_SIZE);
         let grid_lower_z = Math.floor(pos_z / this.constants.CELL_SIZE);
         let grid_upper_z = Math.ceil(pos_z / this.constants.CELL_SIZE);
+        let alpha = 0.95;
         if (index_mod === 3) {
           // vx
           // get the lerp weight and return the lerp'd velocity
           let lerpWeight =
             (pos_x - grid_lower_x * this.constants.CELL_SIZE) /
             this.constants.CELL_SIZE;
-          return (
+          return lerp(
+          lerp(
+            diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x]+oldVx[grid_lower_z][grid_lower_y][grid_lower_x],
+            diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x]+oldVx[grid_lower_z][grid_lower_y][grid_upper_x],
+            lerpWeight
+          ),(
             lerp(
               oldVx[grid_lower_z][grid_lower_y][grid_lower_x],
               oldVx[grid_lower_z][grid_lower_y][grid_upper_x],
@@ -698,15 +704,20 @@
               diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x],
               lerpWeight
             )
-          );
+          ),alpha);
         } else if (index_mod === 4) {
           // vy
           // get the lerp weight and return the lerp'd velocity
           let lerpWeight =
             (pos_y - grid_lower_y * this.constants.CELL_SIZE) /
             this.constants.CELL_SIZE;
-          return (
+          return lerp(
             lerp(
+              diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x]+oldVy[grid_lower_z][grid_lower_y][grid_lower_x],
+              diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x]+oldVy[grid_lower_z][grid_upper_y][grid_lower_x],
+              lerpWeight)
+            ,
+            (lerp(
               oldVy[grid_lower_z][grid_lower_y][grid_lower_x],
               oldVy[grid_lower_z][grid_upper_y][grid_lower_x],
               lerpWeight
@@ -716,14 +727,19 @@
               diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x],
               lerpWeight
             )
-          );
+          ),alpha);
         } else if (index_mod === 5) {
           // vz
           // get the lerp weight and return the lerp'd velocity
           let lerpWeight =
             (pos_z - grid_lower_z * this.constants.CELL_SIZE) /
             this.constants.CELL_SIZE;
-          return (
+          return lerp(
+            lerp(
+              diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x]+oldVz[grid_lower_z][grid_lower_y][grid_lower_x],
+              diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x]+oldVz[grid_upper_z][grid_lower_y][grid_lower_x],
+              lerpWeight)
+            ,(
             lerp(
               oldVz[grid_lower_z][grid_lower_y][grid_lower_x],
               oldVz[grid_upper_z][grid_lower_y][grid_lower_x],
@@ -734,7 +750,7 @@
               diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x],
               lerpWeight
             )
-          );
+          ),alpha);
         }
       })
       .addFunction(function lerp(a, b, t) {
