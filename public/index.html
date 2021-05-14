@@ -235,7 +235,7 @@
         window.smoothSlider = { value: 0.66 };
         gui.add(window.smoothSlider, 'value', 0, 1).name("Smoothing");
 
-        window.fakeWater = true;
+        window.fakeWater = false;
         gui.add(window, 'fakeWater').name("Fake Water").onChange(function (value) {
           updateFunc.update();
         }); 
