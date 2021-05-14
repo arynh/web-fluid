@@ -219,8 +219,8 @@
     function setup() {
       if (initializeGraphics()) {
         var gui = new dat.GUI();
-        var densitySlider = { value: 10000 };
-        gui.add(densitySlider, 'value', 0, 20000).name("Particle Density");
+        var densitySlider = { value: 20000 };
+        gui.add(densitySlider, 'value', 1, 40000).name("Particle Density");
         var updateFunc = {
           update: function () {
             singleEffect = new RayMarchingEffect(40, densitySlider.value);

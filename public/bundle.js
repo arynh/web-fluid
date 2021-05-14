@@ -371,12 +371,9 @@
     pressure,
     pressureOld
   ) => {
-
     let p = pressureOld;
 
     const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
-    // console.log("divergence:");
-    // console.log(d); //.toArray());
 
     // JACOBI ITERATION
     for (let i = 0; i < iterationLimit; i++) {
@@ -384,118 +381,13 @@
     }
 
     return p;
-
-    /* PCG METHOD
-
-    // build coefficient matrix
-    const Adiag = kernels.buildADiag(voxelStates, dt);
-    const Ax = kernels.buildAX(voxelStates, dt);
-    const Ay = kernels.buildAY(voxelStates, dt);
-    const Az = kernels.buildAZ(voxelStates, dt);
-    // build negative divergence vector
-    const d = kernels.flatten(
-      kernels.buildD(voxelStates, velocityX, velocityY, velocityZ)
-    );
-    // console.log("d:");
-    // console.log(d.toArray());
-    // console.log("error:");
-    // console.log(error(d.toArray()));
-
-    // follow PCG algorithm set out in Bridson
-    let p = kernels.zeroVector();
-    let r = d;
-
-    // check if there is a trivial solution
-    if (checkResidual(r.toArray(), tolerance)) {
-      const end = Date.now();
-      console.log(`Solver took 0 iterations in ${end - start} ms.`);
-      const _p = p.toArray();
-      free([p, r]);
-      return _p;
-    }
-
-    let _r = [];
-    let z = r; // applyPreconditioner(r); // TODO: implement the preconditioner.
-    let s = z;
-    let sigma = kernels.math.dot(z, r);
-
-    let iterationCount = 0;
-    while (iterationCount++ < iterationLimit) {
-      // z <- As
-      z = kernels.math.applyA(Adiag, Ax, Ay, Az, s, voxelStates);
-      // console.log("A:");
-      // console.log(Adiag.toArray());
-      // console.log(Ax.toArray());
-      // console.log(Ay.toArray());
-      // console.log(Az.toArray());
-      // console.log("S:");
-      // console.log(s.toArray());
-      // console.log("z <- As:");
-      // console.log(z.toArray());
-
-      // alpha <- sigma / (z dot s)
-      let alpha = kernels.math.dot(z, s);
-
-      // p <- p + alpha * s
-      p = kernels.math.componentWiseAdd(p, kernels.math.scalarMultiply(s, alpha));
-
-      // r <- r - alpha * z
-      r = kernels.math.componentWiseAdd(
-        r,
-        kernels.math.scalarMultiply(z, -alpha)
-      );
-
-      // transfer r to CPU to do error calculation
-      _r = r.toArray();
-
-      // if (iterationCount % 50 === 0) {
-      //   console.log(`error at iteration ${iterationCount}: ${error(_r)}`);
-      // }
-
-      // if the residual is sufficiently small, return early
-      if (checkResidual(_r, tolerance)) {
-        const end = Date.now();
-        // console.log(
-        //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
-        // );
-        const _p = p.toArray();
-        free([p, z, s, r]);
-        return _p;
-      }
-      z = r; // applyPreconditioner(r); // TODO: implement the preconditioner
-
-      // sigma' <- z dot r
-      let _sigma = kernels.math.dot(z, r);
-
-      // beta <- sigma' / sigma
-      let beta = _sigma / sigma;
-
-      // s <- z + beta * s
-      s = kernels.math.componentWiseAdd(z, kernels.math.scalarMultiply(s, beta));
-
-      // sigma <- sigma'
-      sigma = _sigma;
-    }
-
-    const _p = p.toArray();
-    free([p, z, s, r]);
-
-    // console.error("Maximum iterations used in PCG solver!");
-
-    const end = Date.now();
-    // console.log(
-    //   `Solver took ${iterationCount - 1} iterations in ${end - start} ms.`
-    // );
-
-    return _p;
-    */
   };
 
   const createAddGravityKernel = (gpu, nx, ny, nz) =>
     gpu
-      .createKernel(function (velocity_y, dt) {
+      .createKernel(function (velocity_y, dt, voxelStates) {
         return (
-          velocity_y[this.thread.z][this.thread.y][this.thread.x] - dt * 9.81
+          velocity_y[this.thread.z][this.thread.y][this.thread.x] - dt * 1.81
         );
       })
       .setOutput([nx, ny, nz]);
@@ -520,117 +412,33 @@
         if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 0) {
           // get position
           let x = particles[this.thread.x];
-          let y = particles[this.thread.x + 1];
-          let z = particles[this.thread.x + 2];
+          particles[this.thread.x + 1];
+          particles[this.thread.x + 2];
 
           // get x velocity
           let vx = particles[this.thread.x + 3];
 
-          // carry out 2nd order Runge-Kutta solver in one dimension
-          let k1 = dt * vx;
-          let xIntermediate = x + k1 / 2;
-
-          // interpolate the velocity at the intermediate x value
-          let lerpWeight =
-            (xIntermediate -
-              Math.floor(xIntermediate) * this.constants.CELL_SIZE) /
-            this.constants.CELL_SIZE;
-          let vxIntermediate = lerp(
-            velocityFieldX[Math.floor(z / this.constants.CELL_SIZE)][
-              Math.floor(y / this.constants.CELL_SIZE)
-            ][Math.floor(xIntermediate / this.constants.CELL_SIZE)],
-            velocityFieldX[Math.floor(z / this.constants.CELL_SIZE)][
-              Math.floor(y / this.constants.CELL_SIZE)
-            ][Math.ceil(xIntermediate / this.constants.CELL_SIZE)],
-            lerpWeight
-          );
-          let k2 = dt * vxIntermediate;
-          let projectedPosition = x + k2;
-          if (projectedPosition < 0) {
-            projectedPosition = 0;
-          } else if (
-            projectedPosition >
-            this.constants.NX * this.constants.CELL_SIZE
-          ) {
-            projectedPosition = this.constants.NX * this.constants.CELL_SIZE;
-          }
-          return projectedPosition;
+          return x + dt * vx;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
           // get position
-          let x = particles[this.thread.x - 1];
+          particles[this.thread.x - 1];
           let y = particles[this.thread.x];
-          let z = particles[this.thread.x + 1];
+          particles[this.thread.x + 1];
 
           // get y velocity
           let vy = particles[this.thread.x + 3];
 
-          // carry out 2nd order Runge-Kutta solver in one dimension
-          let k1 = dt * vy;
-          let yIntermediate = y + k1 / 2;
-
-          // interpolate the velocity at the intermediate y value
-          let lerpWeight =
-            (yIntermediate -
-              Math.floor(yIntermediate) * this.constants.CELL_SIZE) /
-            this.constants.CELL_SIZE;
-          let vyIntermediate = lerp(
-            velocityFieldY[Math.floor(z / this.constants.CELL_SIZE)][
-              Math.floor(yIntermediate / this.constants.CELL_SIZE)
-            ][Math.floor(x / this.constants.CELL_SIZE)],
-            velocityFieldY[Math.floor(z / this.constants.CELL_SIZE)][
-              Math.ceil(yIntermediate / this.constants.CELL_SIZE)
-            ][Math.floor(x / this.constants.CELL_SIZE)],
-            lerpWeight
-          );
-          let k2 = dt * vyIntermediate;
-          let projectedPosition = y + k2;
-          if (projectedPosition < 0) {
-            projectedPosition = 0;
-          } else if (
-            projectedPosition >
-            this.constants.NY * this.constants.CELL_SIZE
-          ) {
-            projectedPosition = this.constants.NY * this.constants.CELL_SIZE;
-          }
-          return projectedPosition;
+          return y + dt * vy;
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
           // get position
-          let x = particles[this.thread.x - 2];
-          let y = particles[this.thread.x - 1];
+          particles[this.thread.x - 2];
+          particles[this.thread.x - 1];
           let z = particles[this.thread.x];
 
           // get z velocity
           let vz = particles[this.thread.x + 3];
 
-          // carry out 2nd order Runge-Kutta solver in one dimension
-          let k1 = dt * vz;
-          let zIntermediate = z + k1 / 2;
-
-          // interpolate the velocity at the intermediate z value
-          let lerpWeight =
-            (zIntermediate -
-              Math.floor(zIntermediate) * this.constants.CELL_SIZE) /
-            this.constants.CELL_SIZE;
-          let vzIntermediate = lerp(
-            velocityFieldZ[Math.floor(zIntermediate / this.constants.CELL_SIZE)][
-              Math.floor(y / this.constants.CELL_SIZE)
-            ][Math.floor(x / this.constants.CELL_SIZE)],
-            velocityFieldZ[Math.ceil(zIntermediate / this.constants.CELL_SIZE)][
-              Math.floor(y / this.constants.CELL_SIZE)
-            ][Math.floor(x / this.constants.CELL_SIZE)],
-            lerpWeight
-          );
-          let k2 = dt * vzIntermediate;
-          let projectedPosition = z + k2;
-          if (projectedPosition < 0) {
-            projectedPosition = 0;
-          } else if (
-            projectedPosition >
-            this.constants.NZ * this.constants.CELL_SIZE
-          ) {
-            projectedPosition = this.constants.NZ * this.constants.CELL_SIZE;
-          }
-          return projectedPosition;
+          return z + dt * vz;
         } else {
           // don't change the velocities
           return particles[this.thread.x];
@@ -786,7 +594,7 @@
         let numerator = 0;
         let denominator = 0;
         /* loop through particles to find ones that are close, add their
-           velocity contribution to the grid velocity */
+        velocity contribution to the grid velocity */
         for (
           let particleIndex = 0;
           particleIndex < this.constants.PARTICLE_COUNT;
@@ -847,7 +655,15 @@
   // FLIP Kernel
   const createFLIPKernel = (gpu, particleCount, cellSize) =>
     gpu
-      .createKernel(function (particles, diffGridVx, diffGridVy, diffGridVz) {
+      .createKernel(function (
+        particles,
+        diffGridVx,
+        diffGridVy,
+        diffGridVz,
+        oldVx,
+        oldVy,
+        oldVz
+      ) {
         // mod to figure out which index we are at (0-5) for each particle
         let index_mod = this.thread.x % this.constants.ATTRIBUTE_COUNT;
         // if we are looking at the position just return the position
@@ -871,10 +687,17 @@
           let lerpWeight =
             (pos_x - grid_lower_x * this.constants.CELL_SIZE) /
             this.constants.CELL_SIZE;
-          return lerp(
-            diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x],
-            diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x],
-            lerpWeight
+          return (
+            lerp(
+              oldVx[grid_lower_z][grid_lower_y][grid_lower_x],
+              oldVx[grid_lower_z][grid_lower_y][grid_upper_x],
+              lerpWeight
+            ) +
+            lerp(
+              diffGridVx[grid_lower_z][grid_lower_y][grid_lower_x],
+              diffGridVx[grid_lower_z][grid_lower_y][grid_upper_x],
+              lerpWeight
+            )
           );
         } else if (index_mod === 4) {
           // vy
@@ -882,10 +705,17 @@
           let lerpWeight =
             (pos_y - grid_lower_y * this.constants.CELL_SIZE) /
             this.constants.CELL_SIZE;
-          return lerp(
-            diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x],
-            diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x],
-            lerpWeight
+          return (
+            lerp(
+              oldVy[grid_lower_z][grid_lower_y][grid_lower_x],
+              oldVy[grid_lower_z][grid_upper_y][grid_lower_x],
+              lerpWeight
+            ) +
+            lerp(
+              diffGridVy[grid_lower_z][grid_lower_y][grid_lower_x],
+              diffGridVy[grid_lower_z][grid_upper_y][grid_lower_x],
+              lerpWeight
+            )
           );
         } else if (index_mod === 5) {
           // vz
@@ -893,10 +723,17 @@
           let lerpWeight =
             (pos_z - grid_lower_z * this.constants.CELL_SIZE) /
             this.constants.CELL_SIZE;
-          return lerp(
-            diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x],
-            diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x],
-            lerpWeight
+          return (
+            lerp(
+              oldVz[grid_lower_z][grid_lower_y][grid_lower_x],
+              oldVz[grid_upper_z][grid_lower_y][grid_lower_x],
+              lerpWeight
+            ) +
+            lerp(
+              diffGridVz[grid_lower_z][grid_lower_y][grid_lower_x],
+              diffGridVz[grid_upper_z][grid_lower_y][grid_lower_x],
+              lerpWeight
+            )
           );
         }
       })
@@ -952,7 +789,10 @@
         particles,
         velocityXDifference(oldXVelocity, newXVelocity),
         velocityYDifference(oldYVelocity, newYVelocity),
-        velocityZDifference(oldZVelocity, newZVelocity)
+        velocityZDifference(oldZVelocity, newZVelocity),
+        oldXVelocity,
+        oldYVelocity,
+        oldZVelocity
       );
   };
 
@@ -1356,17 +1196,13 @@
               this.constants.FLUID
           )
         ) {
-          return -0;
+          return 0;
         }
 
         const pressureGradient =
           (pressure[this.thread.z][this.thread.y][this.thread.x] -
             pressure[this.thread.z][this.thread.y][this.thread.x - 1]) /
           this.constants.CELL_SIZE;
-
-        // if (pressureGradient !== 0) {
-        //   debugger;
-        // }
 
         const oldVelocity = velocity[this.thread.z][this.thread.y][this.thread.x];
         const newVelocity =
@@ -1405,7 +1241,7 @@
               this.constants.FLUID
           )
         ) {
-          return velocity[this.thread.z][this.thread.y][this.thread.x];
+          return 0;
         }
 
         const pressureGradient =
@@ -1680,20 +1516,20 @@
     console.log(`Kernels compiled in ${end - start} ms.`);
 
     return {
-      particleToXGrid: particleToXGrid.setPipeline(true),
-      particleToYGrid: particleToYGrid.setPipeline(true),
-      particleToZGrid: particleToZGrid.setPipeline(true),
-      copyPressure: copyPressure.setPipeline(true),
-      copyXVelocity: copyXVelocity.setPipeline(true),
-      copyYVelocity: copyYVelocity.setPipeline(true),
-      copyZVelocity: copyZVelocity.setPipeline(true),
+      particleToXGrid: particleToXGrid.setPipeline(true).setImmutable(true),
+      particleToYGrid: particleToYGrid.setPipeline(true).setImmutable(true),
+      particleToZGrid: particleToZGrid.setPipeline(true).setImmutable(true),
+      copyPressure: copyPressure.setPipeline(true).setImmutable(true),
+      copyXVelocity: copyXVelocity.setPipeline(true).setImmutable(true),
+      copyYVelocity: copyYVelocity.setPipeline(true).setImmutable(true),
+      copyZVelocity: copyZVelocity.setPipeline(true).setImmutable(true),
       classifyVoxels: classifyVoxels.setPipeline(true).setImmutable(true),
       addGravity: addGravity.setPipeline(true).setImmutable(true),
       enforceXBoundary: enforceXBoundary.setPipeline(true).setImmutable(true),
       enforceYBoundary: enforceYBoundary.setPipeline(true).setImmutable(true),
       enforceZBoundary: enforceZBoundary.setPipeline(true).setImmutable(true),
       gridToParticles: gridToParticles,
-      advectParticles: advectParticles.setPipeline(true),
+      advectParticles: advectParticles.setPipeline(true).setImmutable(true),
       pressureSolve: pressureSolve,
       updateVelocityX: updateVelocityX.setPipeline(true).setImmutable(true),
       updateVelocityY: updateVelocityY.setPipeline(true).setImmutable(true),
@@ -1701,7 +1537,7 @@
     };
   };
 
-  const FLUID_DENSITY = 0.997;
+  const FLUID_DENSITY = 3.97;
   const SOLVER_TOLERANCE = 1e-4;
   const SOLVER_ITERATION_LIMIT = 200;
 
@@ -1713,13 +1549,17 @@
       );
       this.grid = new MACGrid(
         config.gridBounds,
-        2.0 / Math.cbrt(config.particleDensity)
+        1.0 / Math.cbrt(config.particleDensity)
       );
       this.kernels = compileKernels(gpu, this.particles, this.grid);
     }
 
     step(dt) {
       let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
+
+      // console.log("first particle y velocity:");
+      // console.log(particleBufferCopy[4]);
+
       // transfer particle velocities to the grid and interpolate
       this.grid.velocityX = this.kernels.particleToXGrid(
         particleBufferCopy,
@@ -1734,6 +1574,8 @@
         this.grid.cellSize
       );
 
+      // console.log("before copy:");
+      // console.log(this.grid.velocityY.toArray()[2][2][2]);
       // copy grid values to store the old ones
       this.grid.pressureOld = this.kernels.copyPressure(this.grid.pressure);
       this.grid.velocityXOld = this.kernels.copyXVelocity(this.grid.velocityX);
@@ -1747,12 +1589,21 @@
         this.grid.cellSize
       );
 
+      // console.log("before gravity update:");
+      // console.log(this.grid.velocityY.toArray()[2][2][2]);
+
       // perform gravity update
-      this.grid.velocityY = this.kernels.addGravity(this.grid.velocityY, dt);
+      this.grid.velocityY = this.kernels.addGravity(
+        this.grid.velocityY,
+        dt,
+        this.grid.voxelStates
+      );
+      // console.log("after:");
+      // console.log(this.grid.velocityY.toArray()[2][2][2]);
 
       // enforce boundary conditions
       this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
-      this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
+      // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
       this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
       // do the pressure solve with a zero divergence velocity field
@@ -1768,8 +1619,8 @@
         this.grid.pressure,
         this.grid.pressureOld
       );
-      // console.log("pressure:");
-      // console.log(this.grid.pressure); //.toArray());
+      // // console.log("pressure:");
+      // // console.log(this.grid.pressure); //.toArray());
 
       // update the velocity fields with the new pressure gradients
       this.grid.velocityX = this.kernels.updateVelocityX(
@@ -1778,16 +1629,16 @@
         this.grid.voxelStates,
         dt
       );
-      // console.log("old y velocity:");
-      // console.log(this.grid.velocityY); //.toArray());
+      // // console.log("old y velocity:");
+      // // console.log(this.grid.velocityY); //.toArray());
       this.grid.velocityY = this.kernels.updateVelocityY(
         this.grid.velocityY,
         this.grid.pressure,
         this.grid.voxelStates,
         dt
       );
-      // console.log("new y velocity:");
-      // console.log(this.grid.velocityY); //.toArray());
+      // // console.log("new y velocity:");
+      // // console.log(this.grid.velocityY); //.toArray());
       this.grid.velocityZ = this.kernels.updateVelocityZ(
         this.grid.velocityZ,
         this.grid.pressure,
@@ -1795,7 +1646,7 @@
         dt
       );
 
-      // // enforce boundary conditions
+      // enforce boundary conditions
       this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
       this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
       this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
@@ -1812,6 +1663,9 @@
           particleBufferCopy
         )
         .toArray();
+
+      // console.log(this.particles.get(566).y_velocity);
+
       // advect the particles to find their new positions
       this.particles.particleBuffer = this.kernels
         .advectParticles(
@@ -1998,7 +1852,7 @@
 
       // step the simulation forwards
       deltaTime = Math.min(deltaTime, 1 / 60);
-      // if (localTime < 150) {
+      // if (localTime < 2) {
       sim.step(deltaTime);
       // }
 

@@ -33,7 +33,7 @@ export const createParticleToGridKernel = (
       let numerator = 0;
       let denominator = 0;
       /* loop through particles to find ones that are close, add their
-         velocity contribution to the grid velocity */
+      velocity contribution to the grid velocity */
       for (
         let particleIndex = 0;
         particleIndex < this.constants.PARTICLE_COUNT;

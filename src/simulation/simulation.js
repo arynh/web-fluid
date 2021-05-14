@@ -3,7 +3,7 @@ import { Particles } from "./particles.js";
 import { solve } from "./pressure-solve.js";
 import { compileKernels } from "./kernels/kernels.js";
 
-export const FLUID_DENSITY = 0.997;
+export const FLUID_DENSITY = 3.97;
 const SOLVER_TOLERANCE = 1e-4;
 const SOLVER_ITERATION_LIMIT = 200;
 
@@ -15,13 +15,17 @@ export class Simulation {
     );
     this.grid = new MACGrid(
       config.gridBounds,
-      2.0 / Math.cbrt(config.particleDensity)
+      1.0 / Math.cbrt(config.particleDensity)
     );
     this.kernels = compileKernels(gpu, this.particles, this.grid);
   }
 
   step(dt) {
     let particleBufferCopy = new Float32Array(this.particles.particleBuffer);
+
+    // console.log("first particle y velocity:");
+    // console.log(particleBufferCopy[4]);
+
     // transfer particle velocities to the grid and interpolate
     this.grid.velocityX = this.kernels.particleToXGrid(
       particleBufferCopy,
@@ -36,6 +40,8 @@ export class Simulation {
       this.grid.cellSize
     );
 
+    // console.log("before copy:");
+    // console.log(this.grid.velocityY.toArray()[2][2][2]);
     // copy grid values to store the old ones
     this.grid.pressureOld = this.kernels.copyPressure(this.grid.pressure);
     this.grid.velocityXOld = this.kernels.copyXVelocity(this.grid.velocityX);
@@ -49,12 +55,21 @@ export class Simulation {
       this.grid.cellSize
     );
 
+    // console.log("before gravity update:");
+    // console.log(this.grid.velocityY.toArray()[2][2][2]);
+
     // perform gravity update
-    this.grid.velocityY = this.kernels.addGravity(this.grid.velocityY, dt);
+    this.grid.velocityY = this.kernels.addGravity(
+      this.grid.velocityY,
+      dt,
+      this.grid.voxelStates
+    );
+    // console.log("after:");
+    // console.log(this.grid.velocityY.toArray()[2][2][2]);
 
     // enforce boundary conditions
     this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
-    this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
+    // this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
     this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
 
     // do the pressure solve with a zero divergence velocity field
@@ -70,8 +85,8 @@ export class Simulation {
       this.grid.pressure,
       this.grid.pressureOld
     );
-    // console.log("pressure:");
-    // console.log(this.grid.pressure); //.toArray());
+    // // console.log("pressure:");
+    // // console.log(this.grid.pressure); //.toArray());
 
     // update the velocity fields with the new pressure gradients
     this.grid.velocityX = this.kernels.updateVelocityX(
@@ -80,16 +95,16 @@ export class Simulation {
       this.grid.voxelStates,
       dt
     );
-    // console.log("old y velocity:");
-    // console.log(this.grid.velocityY); //.toArray());
+    // // console.log("old y velocity:");
+    // // console.log(this.grid.velocityY); //.toArray());
     this.grid.velocityY = this.kernels.updateVelocityY(
       this.grid.velocityY,
       this.grid.pressure,
       this.grid.voxelStates,
       dt
     );
-    // console.log("new y velocity:");
-    // console.log(this.grid.velocityY); //.toArray());
+    // // console.log("new y velocity:");
+    // // console.log(this.grid.velocityY); //.toArray());
     this.grid.velocityZ = this.kernels.updateVelocityZ(
       this.grid.velocityZ,
       this.grid.pressure,
@@ -97,7 +112,7 @@ export class Simulation {
       dt
     );
 
-    // // enforce boundary conditions
+    // enforce boundary conditions
     this.grid.velocityX = this.kernels.enforceXBoundary(this.grid.velocityX);
     this.grid.velocityY = this.kernels.enforceYBoundary(this.grid.velocityY);
     this.grid.velocityZ = this.kernels.enforceZBoundary(this.grid.velocityZ);
@@ -114,6 +129,9 @@ export class Simulation {
         particleBufferCopy
       )
       .toArray();
+
+    // console.log(this.particles.get(566).y_velocity);
+
     // advect the particles to find their new positions
     this.particles.particleBuffer = this.kernels
       .advectParticles(

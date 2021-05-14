@@ -176,7 +176,7 @@ function RayMarchingEffect(resolution, density) {
 
     // step the simulation forwards
     deltaTime = Math.min(deltaTime, 1 / 60);
-    // if (localTime < 150) {
+    // if (localTime < 2) {
     sim.step(deltaTime);
     // }
 

@@ -21,17 +21,13 @@ export const createVelocityXUpdateKernel = (
             this.constants.FLUID
         )
       ) {
-        return -0;
+        return 0;
       }
 
       const pressureGradient =
         (pressure[this.thread.z][this.thread.y][this.thread.x] -
           pressure[this.thread.z][this.thread.y][this.thread.x - 1]) /
         this.constants.CELL_SIZE;
-
-      // if (pressureGradient !== 0) {
-      //   debugger;
-      // }
 
       const oldVelocity = velocity[this.thread.z][this.thread.y][this.thread.x];
       const newVelocity =
@@ -70,7 +66,7 @@ export const createVelocityYUpdateKernel = (
             this.constants.FLUID
         )
       ) {
-        return velocity[this.thread.z][this.thread.y][this.thread.x];
+        return 0;
       }
 
       const pressureGradient =
