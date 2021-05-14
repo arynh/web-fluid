@@ -23,6 +23,9 @@ export const createNegativeDivergenceKernel = (gpu, nx, ny, nz, cellSize) =>
           velocityZ[k + 1][j][i] -
           velocityZ[k][j][i]);
 
+      /* TODO: experiment with these boundary conditions to see if we can
+          lose less energy
+
       // modifying RHS (divergence) to account for solid velocities
       if (voxelStates[k][j][i - 1] === this.constants.SOLID) {
         divergence -= scale * velocityX[k][j][i];
@@ -45,6 +48,7 @@ export const createNegativeDivergenceKernel = (gpu, nx, ny, nz, cellSize) =>
       if (voxelStates[k + 1][j][i] === this.constants.SOLID) {
         divergence += scale * velocityZ[k + 1][j][i];
       }
+      */
 
       return divergence;
     })

@@ -68,16 +68,15 @@ function RayMarchingEffect(resolution, density) {
   var startTime = Date.now() / 1000;
   var lastTime = startTime;
 
-  // const gpu = new GPU({ mode: "cpu" });
   const gpu = new GPU();
   const sim = new Simulation(gpu, {
     particleDensity: density,
     particleBounds: {
-      min: vec3.fromValues(0.3, 0.3, 0.3),
-      max: vec3.fromValues(0.7, 0.6, 0.7),
+      min: vec3.fromValues(0.15, 0.15, 0.15),
+      max: vec3.fromValues(0.8, 0.75, 0.35),
     },
     gridBounds: {
-      min: vec3.fromValues(0.1, 0.1, 0.1),
+      min: vec3.fromValues(0.1, 0.0, 0.1),
       max: vec3.fromValues(0.9, 0.9, 0.9),
     },
   });
@@ -176,9 +175,7 @@ function RayMarchingEffect(resolution, density) {
 
     // step the simulation forwards
     deltaTime = Math.min(deltaTime, 1 / 60);
-    // if (localTime < 2) {
-    sim.step(deltaTime);
-    // }
+    sim.step(deltaTime / 2);
 
     var uniformsConst = {
       u_field: textures[0],
