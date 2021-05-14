@@ -362,20 +362,17 @@
   const solve = (
     kernels,
     voxelStates,
-    dt,
     velocityX,
     velocityY,
     velocityZ,
-    tolerance,
     iterationLimit,
-    pressure,
     pressureOld
   ) => {
     let p = pressureOld;
 
     const d = kernels.buildD(voxelStates, velocityX, velocityY, velocityZ);
 
-    // JACOBI ITERATION
+    // Jacobi Iteration
     for (let i = 0; i < iterationLimit; i++) {
       p = kernels.jacobi(d, p, voxelStates);
     }
@@ -386,9 +383,8 @@
   const createAddGravityKernel = (gpu, nx, ny, nz) =>
     gpu
       .createKernel(function (velocity_y, dt, voxelStates) {
-        return (
-          velocity_y[this.thread.z][this.thread.y][this.thread.x] - dt * 1.81
-        );
+        // non-physic gravity for the lolz
+        return velocity_y[this.thread.z][this.thread.y][this.thread.x] - dt * 6.0;
       })
       .setOutput([nx, ny, nz]);
 
@@ -419,6 +415,41 @@
           let vx = particles[this.thread.x + 3];
 
           return x + dt * vx;
+
+          /* FIXME: Runge-Kutta solver does not work yet
+
+          // carry out 2nd order Runge-Kutta solver in one dimension
+          let k1 = dt * vx;
+          let xIntermediate = x + k1 / 2;
+
+          // interpolate the velocity at the intermediate x value
+          let lerpWeight =
+            (xIntermediate -
+              Math.floor(xIntermediate) * this.constants.CELL_SIZE) /
+            this.constants.CELL_SIZE;
+          let vxIntermediate = lerp(
+            velocityFieldX[Math.floor(z / this.constants.CELL_SIZE)][
+              Math.floor(y / this.constants.CELL_SIZE)
+            ][Math.floor(xIntermediate / this.constants.CELL_SIZE)],
+            velocityFieldX[Math.floor(z / this.constants.CELL_SIZE)][
+              Math.floor(y / this.constants.CELL_SIZE)
+            ][Math.ceil(xIntermediate / this.constants.CELL_SIZE)],
+            lerpWeight
+          );
+          let k2 = dt * vxIntermediate;
+          let projectedPosition = x + k2;
+          if (projectedPosition <= 0) {
+            projectedPosition = 0.01;
+          } else if (
+            projectedPosition >=
+            this.constants.NX * this.constants.CELL_SIZE
+          ) {
+            projectedPosition =
+              this.constants.NX * this.constants.CELL_SIZE - 0.01;
+          }
+          return projectedPosition;
+
+          */
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
           // get position
           particles[this.thread.x - 1];
@@ -429,6 +460,41 @@
           let vy = particles[this.thread.x + 3];
 
           return y + dt * vy;
+
+          /* FIXME: Runge-Kutta solver does not work yet
+
+          // carry out 2nd order Runge-Kutta solver in one dimension
+          let k1 = dt * vy;
+          let yIntermediate = y + k1 / 2;
+
+          // interpolate the velocity at the intermediate y value
+          let lerpWeight =
+            (yIntermediate -
+              Math.floor(yIntermediate) * this.constants.CELL_SIZE) /
+            this.constants.CELL_SIZE;
+          let vyIntermediate = lerp(
+            velocityFieldY[Math.floor(z / this.constants.CELL_SIZE)][
+              Math.floor(yIntermediate / this.constants.CELL_SIZE)
+            ][Math.floor(x / this.constants.CELL_SIZE)],
+            velocityFieldY[Math.floor(z / this.constants.CELL_SIZE)][
+              Math.ceil(yIntermediate / this.constants.CELL_SIZE)
+            ][Math.floor(x / this.constants.CELL_SIZE)],
+            lerpWeight
+          );
+          let k2 = dt * vyIntermediate;
+          let projectedPosition = y + k2;
+          if (projectedPosition <= 0) {
+            projectedPosition = 0.01;
+          } else if (
+            projectedPosition >=
+            this.constants.NY * this.constants.CELL_SIZE
+          ) {
+            projectedPosition =
+              this.constants.NY * this.constants.CELL_SIZE - 0.01;
+          }
+          return projectedPosition;
+
+          */
         } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
           // get position
           particles[this.thread.x - 2];
@@ -439,6 +505,41 @@
           let vz = particles[this.thread.x + 3];
 
           return z + dt * vz;
+
+          /* FIXME: Runge-Kutta solver does not work yet
+
+          // carry out 2nd order Runge-Kutta solver in one dimension
+          let k1 = dt * vz;
+          let zIntermediate = z + k1 / 2;
+
+          // interpolate the velocity at the intermediate z value
+          let lerpWeight =
+            (zIntermediate -
+              Math.floor(zIntermediate) * this.constants.CELL_SIZE) /
+            this.constants.CELL_SIZE;
+          let vzIntermediate = lerp(
+            velocityFieldZ[Math.floor(zIntermediate / this.constants.CELL_SIZE)][
+              Math.floor(y / this.constants.CELL_SIZE)
+            ][Math.floor(x / this.constants.CELL_SIZE)],
+            velocityFieldZ[Math.ceil(zIntermediate / this.constants.CELL_SIZE)][
+              Math.floor(y / this.constants.CELL_SIZE)
+            ][Math.floor(x / this.constants.CELL_SIZE)],
+            lerpWeight
+          );
+          let k2 = dt * vzIntermediate;
+          let projectedPosition = z + k2;
+          if (projectedPosition <= 0) {
+            projectedPosition = 0.01;
+          } else if (
+            projectedPosition >=
+            this.constants.NZ * this.constants.CELL_SIZE
+          ) {
+            projectedPosition =
+              this.constants.NZ * this.constants.CELL_SIZE - 0.01;
+          }
+          return projectedPosition;
+          
+          */
         } else {
           // don't change the velocities
           return particles[this.thread.x];
@@ -796,228 +897,6 @@
       );
   };
 
-  /**
-   * Component-wise add two vectors.
-   */
-  const createComponentWiseAddKernel = (gpu, vectorLength) =>
-    gpu
-      .createKernel(function (a, b) {
-        return a[this.thread.x] + b[this.thread.x];
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setOutput([vectorLength]);
-
-  /**
-   * Component-wise multiply two vectors.
-   */
-  const createComponentWiseMultiplyKernel = (gpu, vectorLength) =>
-    gpu
-      .createKernel(function (a, b) {
-        return a[this.thread.x] * b[this.thread.x];
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setOutput([vectorLength]);
-
-  /**
-   * Muliply a vector `a` by a scalar.
-   */
-  const createScalarMultiplyKernel = (gpu, vectorLength) =>
-    gpu
-      .createKernel(function (a, scalar) {
-        return scalar * a[this.thread.x];
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setOutput([vectorLength]);
-
-  /**
-   * Assumption!
-   * As long as there is the default solid walls around the fluid, edge cases
-   * will be fine. Otherwise, this will need to be modified to support more
-   * complex boundary conditions.
-   */
-
-  const createADiagKernel = (gpu, nx, ny, nz, cellSize) =>
-    gpu
-      .createKernel(function (voxelStates, dt) {
-        // for brevity
-        const i = this.thread.x;
-        const j = this.thread.y;
-        const k = this.thread.z;
-        const FLUID = this.constants.FLUID;
-        const AIR = this.constants.AIR;
-
-        // only consider fluid cells
-        if (voxelStates[k][j][i] !== FLUID) {
-          return 0;
-        }
-
-        const scale =
-          dt /
-          (this.constants.FLUID_DENSITY *
-            this.constants.CELL_SIZE *
-            this.constants.CELL_SIZE);
-
-        let accumulator = 0;
-
-        // negative x neighbor
-        if (voxelStates[k][j][i - 1] === FLUID) {
-          accumulator += scale;
-        }
-        // positive x neighbor
-        if (
-          voxelStates[k][j][i + 1] === FLUID ||
-          voxelStates[k][j][i + 1] === AIR
-        ) {
-          accumulator += scale;
-        }
-
-        // negative y neighbor
-        if (voxelStates[k][j - 1][i] === FLUID) {
-          accumulator += scale;
-        }
-        // positive y neighbor
-        if (
-          voxelStates[k][j + 1][i] === FLUID ||
-          voxelStates[k][j + 1][i] === AIR
-        ) {
-          accumulator += scale;
-        }
-
-        // negative z neighbor
-        if (voxelStates[k - 1][j][i] === FLUID) {
-          accumulator += scale;
-        }
-        // positive z neighbor
-        if (
-          voxelStates[k + 1][j][i] === FLUID ||
-          voxelStates[k + 1][j][i] === AIR
-        ) {
-          accumulator += scale;
-        }
-
-        return accumulator;
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setConstants({
-        CELL_SIZE: cellSize,
-        FLUID_DENSITY: FLUID_DENSITY,
-        AIR: STATE_ENUM.AIR,
-        FLUID: STATE_ENUM.FLUID,
-        SOLID: STATE_ENUM.SOLID,
-      })
-      .setOutput([nx, ny, nz]);
-
-  const createAXKernel = (gpu, nx, ny, nz, cellSize) =>
-    gpu
-      .createKernel(function (voxelStates, dt) {
-        // for brevity
-        const i = this.thread.x;
-        const j = this.thread.y;
-        const k = this.thread.z;
-        const FLUID = this.constants.FLUID;
-
-        // only consider fluid cells
-        if (voxelStates[k][j][i] !== FLUID) {
-          return 0;
-        }
-
-        const scale =
-          dt /
-          (this.constants.FLUID_DENSITY *
-            this.constants.CELL_SIZE *
-            this.constants.CELL_SIZE);
-
-        let accumulator = 0;
-        //positive x neighbor
-        if (voxelStates[k][j][i + 1] === FLUID) {
-          accumulator = -scale;
-        }
-        return accumulator;
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setConstants({
-        CELL_SIZE: cellSize,
-        FLUID_DENSITY: FLUID_DENSITY,
-        AIR: STATE_ENUM.AIR,
-        FLUID: STATE_ENUM.FLUID,
-        SOLID: STATE_ENUM.SOLID,
-      })
-      .setOutput([nx, ny, nz]);
-
-  const createAYKernel = (gpu, nx, ny, nz, cellSize) =>
-    gpu
-      .createKernel(function (voxelStates, dt) {
-        // for brevity
-        const i = this.thread.x;
-        const j = this.thread.y;
-        const k = this.thread.z;
-        const FLUID = this.constants.FLUID;
-
-        // only consider fluid cells
-        if (voxelStates[k][j][i] !== FLUID) {
-          return 0;
-        }
-
-        const scale =
-          dt /
-          (this.constants.FLUID_DENSITY *
-            this.constants.CELL_SIZE *
-            this.constants.CELL_SIZE);
-
-        let accumulator = 0;
-        //positive y neighbor
-        if (voxelStates[k][j + 1][i] === FLUID) {
-          accumulator = -scale;
-        }
-        return accumulator;
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setConstants({
-        CELL_SIZE: cellSize,
-        FLUID_DENSITY: FLUID_DENSITY,
-        AIR: STATE_ENUM.AIR,
-        FLUID: STATE_ENUM.FLUID,
-        SOLID: STATE_ENUM.SOLID,
-      })
-      .setOutput([nx, ny, nz]);
-
-  const createAZKernel = (gpu, nx, ny, nz, cellSize) =>
-    gpu
-      .createKernel(function (voxelStates, dt) {
-        // for brevity
-        const i = this.thread.x;
-        const j = this.thread.y;
-        const k = this.thread.z;
-        const FLUID = this.constants.FLUID;
-
-        // only consider fluid cells
-        if (voxelStates[k][j][i] !== FLUID) {
-          return 0;
-        }
-
-        const scale =
-          dt /
-          (this.constants.FLUID_DENSITY *
-            this.constants.CELL_SIZE *
-            this.constants.CELL_SIZE);
-
-        let accumulator = 0;
-        //positive z neighbor
-        if (voxelStates[k + 1][j][i] === FLUID) {
-          accumulator = -scale;
-        }
-        return accumulator;
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setConstants({
-        CELL_SIZE: cellSize,
-        FLUID_DENSITY: FLUID_DENSITY,
-        AIR: STATE_ENUM.AIR,
-        FLUID: STATE_ENUM.FLUID,
-        SOLID: STATE_ENUM.SOLID,
-      })
-      .setOutput([nx, ny, nz]);
-
   const createNegativeDivergenceKernel = (gpu, nx, ny, nz, cellSize) =>
     gpu
       .createKernel(function (voxelStates, velocityX, velocityY, velocityZ) {
@@ -1077,107 +956,6 @@
         SOLID: STATE_ENUM.SOLID,
       })
       .setOutput([nx, ny, nz]);
-
-  /**
-   * Map from 3D arrays to 1D vectors.
-   *
-   * To unflatten:
-   * `(k * ny + i) * nx + j`
-   */
-  const createFlattenKernel = (gpu, nx, ny, nz) =>
-    gpu
-      .createKernel(function (array) {
-        const aux = this.thread.x % (this.constants.NX * this.constants.NY);
-        const i = Math.floor(aux / this.constants.NY);
-        const j = aux % this.constants.NX;
-        const k = Math.floor(
-          this.thread.x / (this.constants.NX * this.constants.NY)
-        );
-        return array[k][j][i];
-      })
-      .setTactic("precision")
-      .setConstants({ NX: nx, NY: ny, NZ: nz })
-      .setOutput([nx * ny * nz]);
-
-  const createUnflattenKernel = (gpu, nx, ny, nz) =>
-    gpu
-      .createKernel(function (flat) {
-        return flat[
-          (this.thread.z * this.constants.NY + this.thread.x) *
-            this.constants.NX +
-            this.thread.y
-        ];
-      })
-      .setTactic("precision")
-      .setConstants({ NX: nx, NY: ny, NZ: nz })
-      .setOutput([nx, ny, nz]);
-
-  /**
-   * Produce the matrix-vector product `Ax` from the sparsely stored A and x.
-   */
-  const createApplyAKernel = (gpu, vectorLength, nx, ny, nz) =>
-    gpu
-      .createKernel(function (Adiag, Ax, Ay, Az, x, voxelStates) {
-        const aux = this.thread.x % (this.constants.NX * this.constants.NY);
-        const i = Math.floor(aux / this.constants.NY);
-        const j = aux % this.constants.NX;
-        const k = Math.floor(
-          this.thread.x / (this.constants.NX * this.constants.NY)
-        );
-
-        // only consider fluid cells
-        if (voxelStates[k][j][i] !== this.constants.FLUID) {
-          return 0;
-        }
-
-        let vectorIndex = this.thread.x;
-        let accumulator = Adiag[k][j][i] * x[vectorIndex];
-
-        // negative x neighbor
-        if (voxelStates[k][j][i - 1] === this.constants.FLUID) {
-          vectorIndex = gridToVectorIndex(i - 1, j, k);
-          accumulator += Ax[k][j][i - 1] * x[vectorIndex];
-        }
-        // positive x neighbor
-        if (voxelStates[k][j][i + 1] === this.constants.FLUID) {
-          vectorIndex = gridToVectorIndex(i + 1, j, k);
-          accumulator += Ax[k][j][i + 1] * x[vectorIndex];
-        }
-        // negative y neighbor
-        if (voxelStates[k][j - 1][i] === this.constants.FLUID) {
-          vectorIndex = gridToVectorIndex(i, j - 1, k);
-          accumulator += Ay[k][j - 1][i] * x[vectorIndex];
-        }
-        // positive y neighbor
-        if (voxelStates[k][j + 1][i] === this.constants.FLUID) {
-          vectorIndex = gridToVectorIndex(i, j + 1, k);
-          accumulator += Ay[k][j + 1][i] * x[vectorIndex];
-        }
-        // negative z neighbor
-        if (voxelStates[k - 1][j][i] === this.constants.FLUID) {
-          vectorIndex = gridToVectorIndex(i, j, k - 1);
-          accumulator += Az[k - 1][j][i] * x[vectorIndex];
-        }
-        // positive z neighbor
-        if (voxelStates[k + 1][j][i] === this.constants.FLUID) {
-          vectorIndex = gridToVectorIndex(i, j, k + 1);
-          accumulator += Az[k + 1][j][i] * x[vectorIndex];
-        }
-
-        return accumulator;
-      })
-      .addFunction(function gridToVectorIndex(i, j, k) {
-        return (k * this.constants.NY + i) * this.constants.NX + j;
-      })
-      .setTactic("precision") // vector math should be high precision
-      .setConstants({
-        VECTOR_LENGTH: vectorLength,
-        NX: nx,
-        NY: ny,
-        NZ: nz,
-        FLUID: STATE_ENUM.FLUID,
-      })
-      .setOutput([vectorLength]);
 
   const createVelocityXUpdateKernel = (
     gpu,
@@ -1424,59 +1202,17 @@
 
     // do pressure solve
 
-    // build coefficient matrix
-    const buildADiag = createADiagKernel(gpu, ...gridSize, grid.cellSize);
-    const buildAX = createAXKernel(gpu, ...gridSize, grid.cellSize);
-    const buildAY = createAYKernel(gpu, ...gridSize, grid.cellSize);
-    const buildAZ = createAZKernel(gpu, ...gridSize, grid.cellSize);
-
     // build negative divergence vector with boundary conditions
     const buildD = createNegativeDivergenceKernel(
       gpu,
       ...gridSize,
       grid.cellSize
     );
-    const flatten = createFlattenKernel(gpu, ...gridSize);
-    const unflatten = createUnflattenKernel(gpu, ...gridSize);
-
-    // compile kernels to do vector operations
-    const pcgVectorLength = grid.nx * grid.ny * grid.nz;
-    const componentWiseAdd = createComponentWiseAddKernel(gpu, pcgVectorLength);
-    const componentWiseMultiply = createComponentWiseMultiplyKernel(
-      gpu,
-      pcgVectorLength
-    );
-    // implement dot product's sum portion on the CPU
-    const dot = (a, b) =>
-      componentWiseMultiply(a, b).reduce((sum, n) => sum + n, 0);
-    const scalarMultiply = createScalarMultiplyKernel(gpu, pcgVectorLength);
-    const applyA = createApplyAKernel(gpu, pcgVectorLength, ...gridSize);
-    const math = {
-      componentWiseAdd: componentWiseAdd.setPipeline(true).setImmutable(true),
-      dot: dot,
-      scalarMultiply: scalarMultiply.setPipeline(true).setImmutable(true),
-      applyA: applyA.setPipeline(true).setImmutable(true),
-    };
-
-    // PCG methods
-    const zeroVector = gpu
-      .createKernel(function () {
-        return 0;
-      })
-      .setOutput([pcgVectorLength]);
 
     const jacobi = createJacobiIterationKernel(gpu, ...gridSize);
 
     const pressureSolve = {
-      buildADiag: buildADiag.setPipeline(true),
-      buildAX: buildAX.setPipeline(true),
-      buildAY: buildAY.setPipeline(true),
-      buildAZ: buildAZ.setPipeline(true),
       buildD: buildD.setPipeline(true).setImmutable(true),
-      flatten: flatten.setPipeline(true).setImmutable(true),
-      unflatten: unflatten.setPipeline(true),
-      math: math,
-      zeroVector: zeroVector.setPipeline(true).setImmutable(true),
       jacobi: jacobi.setPipeline(true).setImmutable(true),
     };
 
@@ -1541,9 +1277,8 @@
     };
   };
 
-  const FLUID_DENSITY = 3.97;
-  const SOLVER_TOLERANCE = 1e-4;
-  const SOLVER_ITERATION_LIMIT = 200;
+  const FLUID_DENSITY = 3.75;
+  const SOLVER_ITERATION_LIMIT = 50;
 
   class Simulation {
     constructor(gpu, config) {
@@ -1551,10 +1286,7 @@
         config.particleDensity,
         config.particleBounds
       );
-      this.grid = new MACGrid(
-        config.gridBounds,
-        1.0 / Math.cbrt(config.particleDensity)
-      );
+      this.grid = new MACGrid(config.gridBounds, 0.025);
       this.kernels = compileKernels(gpu, this.particles, this.grid);
     }
 
@@ -1604,13 +1336,10 @@
       this.grid.pressure = solve(
         this.kernels.pressureSolve,
         this.grid.voxelStates,
-        dt,
         this.grid.velocityX,
         this.grid.velocityY,
         this.grid.velocityZ,
-        SOLVER_TOLERANCE,
         SOLVER_ITERATION_LIMIT,
-        this.grid.pressure,
         this.grid.pressureOld
       );
 
@@ -1730,16 +1459,15 @@
     var startTime = Date.now() / 1000;
     var lastTime = startTime;
 
-    // const gpu = new GPU({ mode: "cpu" });
     const gpu = new GPU();
     const sim = new Simulation(gpu, {
       particleDensity: density,
       particleBounds: {
-        min: fromValues(0.3, 0.3, 0.3),
-        max: fromValues(0.7, 0.6, 0.7),
+        min: fromValues(0.15, 0.15, 0.15),
+        max: fromValues(0.8, 0.75, 0.35),
       },
       gridBounds: {
-        min: fromValues(0.1, 0.1, 0.1),
+        min: fromValues(0.1, 0.0, 0.1),
         max: fromValues(0.9, 0.9, 0.9),
       },
     });
@@ -1838,9 +1566,7 @@
 
       // step the simulation forwards
       deltaTime = Math.min(deltaTime, 1 / 60);
-      // if (localTime < 2) {
-      sim.step(deltaTime);
-      // }
+      sim.step(deltaTime / 2);
 
       var uniformsConst = {
         u_field: textures[0],

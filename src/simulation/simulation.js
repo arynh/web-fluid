@@ -3,9 +3,8 @@ import { Particles } from "./particles.js";
 import { solve } from "./pressure-solve.js";
 import { compileKernels } from "./kernels/kernels.js";
 
-export const FLUID_DENSITY = 3.97;
-const SOLVER_TOLERANCE = 1e-4;
-const SOLVER_ITERATION_LIMIT = 200;
+export const FLUID_DENSITY = 3.75;
+const SOLVER_ITERATION_LIMIT = 50;
 
 export class Simulation {
   constructor(gpu, config) {
@@ -13,10 +12,7 @@ export class Simulation {
       config.particleDensity,
       config.particleBounds
     );
-    this.grid = new MACGrid(
-      config.gridBounds,
-      1.0 / Math.cbrt(config.particleDensity)
-    );
+    this.grid = new MACGrid(config.gridBounds, 0.025);
     this.kernels = compileKernels(gpu, this.particles, this.grid);
   }
 
@@ -66,13 +62,10 @@ export class Simulation {
     this.grid.pressure = solve(
       this.kernels.pressureSolve,
       this.grid.voxelStates,
-      dt,
       this.grid.velocityX,
       this.grid.velocityY,
       this.grid.velocityZ,
-      SOLVER_TOLERANCE,
       SOLVER_ITERATION_LIMIT,
-      this.grid.pressure,
       this.grid.pressureOld
     );
 

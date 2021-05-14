@@ -28,6 +28,8 @@ export const createAdvectParticlesKernel = (
 
         return x + dt * vx;
 
+        /* FIXME: Runge-Kutta solver does not work yet
+
         // carry out 2nd order Runge-Kutta solver in one dimension
         let k1 = dt * vx;
         let xIntermediate = x + k1 / 2;
@@ -58,6 +60,8 @@ export const createAdvectParticlesKernel = (
             this.constants.NX * this.constants.CELL_SIZE - 0.01;
         }
         return projectedPosition;
+
+        */
       } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 1) {
         // get position
         let x = particles[this.thread.x - 1];
@@ -68,6 +72,8 @@ export const createAdvectParticlesKernel = (
         let vy = particles[this.thread.x + 3];
 
         return y + dt * vy;
+
+        /* FIXME: Runge-Kutta solver does not work yet
 
         // carry out 2nd order Runge-Kutta solver in one dimension
         let k1 = dt * vy;
@@ -99,6 +105,8 @@ export const createAdvectParticlesKernel = (
             this.constants.NY * this.constants.CELL_SIZE - 0.01;
         }
         return projectedPosition;
+
+        */
       } else if (this.thread.x % this.constants.ATTRIBUTE_COUNT === 2) {
         // get position
         let x = particles[this.thread.x - 2];
@@ -109,6 +117,8 @@ export const createAdvectParticlesKernel = (
         let vz = particles[this.thread.x + 3];
 
         return z + dt * vz;
+
+        /* FIXME: Runge-Kutta solver does not work yet
 
         // carry out 2nd order Runge-Kutta solver in one dimension
         let k1 = dt * vz;
@@ -140,6 +150,8 @@ export const createAdvectParticlesKernel = (
             this.constants.NZ * this.constants.CELL_SIZE - 0.01;
         }
         return projectedPosition;
+        
+        */
       } else {
         // don't change the velocities
         return particles[this.thread.x];
