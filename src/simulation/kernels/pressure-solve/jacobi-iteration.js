@@ -9,8 +9,6 @@ export const createJacobiIterationKernel = (gpu, nx, ny, nz) =>
 
       if (voxelStates[k][j][i] === this.constants.AIR) {
         return 0;
-      } else if (voxelStates[k][j][i] === this.constants.SOLID) {
-        return 100;
       }
 
       const divergenceCenter = negativeDivergence[k][j][i];
