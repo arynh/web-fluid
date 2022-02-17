@@ -4,6 +4,8 @@ A web-based, 3D, real-time fluid simulation.
 
 Final Project for CS 419, Production Computer Graphics, at UIUC.
 
+![simulation preview](https://github.com/arynh/effective-umbrella/blob/master/assets/sim.gif?raw=true)
+
 Authors:
 
 - Idan Raiter
@@ -29,3 +31,5 @@ For every simulation loop:
 ## Installation
 
 To install this project, clone the repository and run `yarn` in the root directory. Then you can run `yarn dev` to start the local development server.
+
+![fake water](https://github.com/arynh/effective-umbrella/blob/master/assets/fake.gif?raw=true)
